@@ -950,8 +950,9 @@ async function seedFromSite(){
     return n>0;
   }catch(e){return false;}
 }
-/* 📦 data pack: export your downloaded caches / import a friend's — makes a freshly-shared file work instantly */
-const PACK_RE=/^tkm_(c5_|tasks3$|ammo4$|gear2$|plate1$|loot2$|craft1$|bart1$|hide3$|bossp$|guns1$)/;
+/* 📦 data pack: export your downloaded caches / import a friend's — makes a freshly-shared file work instantly.
+   Includes EVERY game-data cache, any generation (older map caches still render fine) — never personal data. */
+const PACK_RE={test:k=>/^tkm_/.test(k)&&!KEEP_KEYS.test(k)};
 function packExport(){
   const out={};
   for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&PACK_RE.test(k))out[k]=localStorage.getItem(k);}
