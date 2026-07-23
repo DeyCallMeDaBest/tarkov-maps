@@ -937,6 +937,19 @@ function hiPending(){
   const m=Object.values(S.items||{}).flat().find(x=>x&&x._ll&&((x.name||'')+' '+(x.sub||'')).toLowerCase().includes(q));
   if(m){S.pendingHi=null;try{S.leaf.setView(m._ll,Math.min(S.cfg.mxz-0.5,4.5));}catch(e){}openDetail(m);}
 }
+/* 🌐 hosted fallback: when the live API is down and nothing is cached, seed from the site's own datapack.json (if present) */
+let seedTried=false;
+async function seedFromSite(){
+  if(seedTried||location.protocol!=='https:')return false;
+  seedTried=true;
+  try{
+    const r=await fetch('datapack.json',{cache:'no-store'});
+    if(!r.ok)return false;
+    const o=await r.json();let n=0;
+    Object.entries(o).forEach(([k,v])=>{if(PACK_RE.test(k)&&typeof v==='string'&&!localStorage.getItem(k)){safeSet(k,v);n++;}});
+    return n>0;
+  }catch(e){return false;}
+}
 /* 📦 data pack: export your downloaded caches / import a friend's — makes a freshly-shared file work instantly */
 const PACK_RE=/^tkm_(c5_|tasks3$|ammo4$|gear2$|plate1$|loot2$|craft1$|bart1$|hide3$|bossp$|guns1$)/;
 function packExport(){
@@ -1325,6 +1338,10 @@ async function loadMapData(cfg){
     for(const n of cfg.api){
       try{const r=await gql(MAP_Q(n));if(r.maps&&r.maps.length){const d=r.maps[0];S.staleData=false;try{safeSet(ck,JSON.stringify({ts:Date.now(),d}));}catch(e){}return d;}}catch(e){console.warn('map query',n,e);}
     }
+  }
+  /* API down: on the hosted site, seed from the repo's bundled datapack and retry the cache */
+  if(await seedFromSite()){
+    try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&c.d){S.staleData=true;return c.d;}}catch(e){}
   }
   return null;
 }
