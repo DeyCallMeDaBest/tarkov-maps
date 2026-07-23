@@ -1272,10 +1272,17 @@ async function gql(query){
   const ac=new AbortController();
   const to=setTimeout(()=>ac.abort(),12000);
   try{
-    const r=await fetch('https://api.tarkov.dev/graphql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query}),signal:ac.signal});
-    const j=await r.json();
-    if(j.errors)throw new Error(j.errors[0].message);
-    return j.data;
+    /* GET first: a "simple" CORS request with NO preflight — survives API-side bot/CORS tightening
+       that can reject cross-origin JSON POSTs even while the API itself is healthy. */
+    try{
+      const r=await fetch('https://api.tarkov.dev/graphql?query='+encodeURIComponent(query),{signal:ac.signal});
+      if(r.ok){const j=await r.json();if(j&&!j.errors&&j.data)return j.data;}
+    }catch(e){}
+    /* fallback: classic POST */
+    const r2=await fetch('https://api.tarkov.dev/graphql',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query}),signal:ac.signal});
+    const j2=await r2.json();
+    if(j2.errors)throw new Error((j2.errors[0]&&j2.errors[0].message)||'API returned an error');
+    return j2.data;
   }finally{clearTimeout(to);}
 }
 const MAP_Q=n=>`{maps(name:"${n}"){normalizedName raidDuration players description enemies
