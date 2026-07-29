@@ -632,7 +632,7 @@ function safeSet(k,v){
     const kill=[];
     for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);
       if(!key||key===k||KEEP_KEYS.test(key))continue;
-      if(/^tkm_(c3_|c4_|tasks$|hide2$|ammo2$|loot1$|guns1$)/.test(key))kill.push(key);}
+      if(/^tkm_(c3_|c4_|tasks$|hide2$|ammo2$|loot1$|gear1$)/.test(key))kill.push(key);}
     kill.forEach(x=>localStorage.removeItem(x));
     localStorage.setItem(k,v);return;
   }catch(e){}
@@ -650,7 +650,7 @@ function safeSet(k,v){
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);if(!k)continue;
     if(/^tkm_(c3_|tasks$|hide2$|ammo2$|loot1$)/.test(k))kill.push(k);
-    if(/^tkm_c4_/.test(k)&&localStorage.getItem('tkm_c5_'+k.slice(7)))kill.push(k);
+    if(/^tkm_c4_/.test(k)&&packGet('tkm_c5_'+k.slice(7)))kill.push(k);
   }
   kill.forEach(k=>localStorage.removeItem(k));
 }catch(e){}})();
@@ -663,7 +663,7 @@ function llInfo(v){
   return {txt:' LL'+v.minTraderLevel+(pl?' (≈L'+pl+')':''),lvl:pl||1};
 }
 async function loadAmmo(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_ammo4')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_ammo4')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{const r=await gql(AMMO_Q);try{safeSet('tkm_ammo4',JSON.stringify({ts:Date.now(),d:r.ammo}));}catch(e){}return r.ammo;}catch(e){return null;}
 }
 function bestSeller(it){
@@ -683,14 +683,14 @@ async function itemSearch(q){
 }
 const HIDEOUT_Q=`{hideoutStations{name levels{level itemRequirements{count item{name avg24hPrice iconLink}}}}}`;
 async function loadHideout(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_hide3')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_hide3')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{const r=await gql(HIDEOUT_Q);try{safeSet('tkm_hide3',JSON.stringify({ts:Date.now(),d:r.hideoutStations}));}catch(e){}return r.hideoutStations;}
   catch(e){console.warn('hideout query failed',e);return null;}
 }
 /* ============ BULK DATA — one request per category (per-item lookups got burst rate-limited) ============ */
 const GUNS_Q=`{items(types:[gun]){name shortName iconLink gridImageLink image512pxLink avg24hPrice buyFor{priceRUB vendor{name}} properties{__typename ...on ItemPropertiesWeapon{caliber ergonomics recoilVertical fireRate}}}}`;
 async function loadGuns(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_guns1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_guns1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{
     const r=await gql(GUNS_Q);
     const d=(r.items||[]).map(g=>({n:g.name,sn:g.shortName,ic:g.iconLink,im:g.image512pxLink||g.gridImageLink||g.iconLink,p:g.avg24hPrice,
@@ -718,7 +718,7 @@ function gridSum(gr){
   return Object.entries(m).sort((a,b)=>{const [aw,ah]=a[0].split('×').map(Number),[bw,bh]=b[0].split('×').map(Number);return (bw*bh)-(aw*ah);}).map(([k,c])=>c+'× '+k).join(' · ');
 }
 async function loadGear(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_gear2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_gear2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{
     const r=await gql(GEAR_Q);
     const d={armor:trimGear(r.armor),rig:trimGear(r.rig),bp:trimGear(r.bp),helm:trimGear(r.helm)};
@@ -729,7 +729,7 @@ async function loadGear(){
 /* ---- armor plates: live market + per-armor compatibility ---- */
 const PLATE_Q=`{items(types:[armorPlate]){name shortName iconLink avg24hPrice buyFor{priceRUB vendor{name ...on TraderOffer{minTraderLevel}}} properties{...on ItemPropertiesArmorAttachment{class durability material{name}}}}}`;
 async function loadPlates(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_plate1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_plate1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{
     const r=await gql(PLATE_Q);
     const d=(r.items||[]).map(x=>({n:x.name,sn:x.shortName,ic:x.iconLink,p:x.avg24hPrice||0,
@@ -750,7 +750,7 @@ async function plateSlots(q){
   }catch(e){return null;}
 }
 async function loadBossPics(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_bossp')||'null');if(c&&Date.now()-c.ts<86400000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_bossp')||'null');if(c&&Date.now()-c.ts<86400000)return c.d;}catch(e){}
   try{const r=await gql(`{bosses{name imagePortraitLink}}`);
     try{safeSet('tkm_bossp',JSON.stringify({ts:Date.now(),d:r.bosses}));}catch(e){}
     return r.bosses;}catch(e){return null;}
@@ -758,17 +758,17 @@ async function loadBossPics(){
 /* ---- money-maker data: crafts, barters, junk values ---- */
 const CRAFT_Q=`{crafts{duration level station{name} requiredItems{count item{name avg24hPrice}} rewardItems{count item{name shortName avg24hPrice iconLink}}}}`;
 async function loadCrafts(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_craft1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_craft1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{const r=await gql(CRAFT_Q);try{safeSet('tkm_craft1',JSON.stringify({ts:Date.now(),d:r.crafts}));}catch(e){}return r.crafts;}catch(e){console.warn('crafts',e);return null;}
 }
 const BARTER_Q=`{barters{level trader{name} requiredItems{count item{name avg24hPrice}} rewardItems{count item{name shortName avg24hPrice iconLink}}}}`;
 async function loadBarters(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_bart1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_bart1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{const r=await gql(BARTER_Q);try{safeSet('tkm_bart1',JSON.stringify({ts:Date.now(),d:r.barters}));}catch(e){}return r.barters;}catch(e){console.warn('barters',e);return null;}
 }
 const LOOT_Q=`{items(types:[barter]){name shortName iconLink basePrice width height avg24hPrice sellFor{priceRUB vendor{name}}}}`;
 async function loadLoot(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_loot2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_loot2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
   try{
     const r=await gql(LOOT_Q);
     const d=(r.items||[]).map(it=>{
@@ -910,7 +910,7 @@ const MAP_GUIDES={
  'streets-of-tarkov':'<b>⇄ LABS ENTRANCE on this map:</b> Klimova St — the building with the <b>cosmonaut mural</b>; the stairwell beside it leads down to a basement metal door (see the ⇄ transit marker, or search "lab" in 🔍). Needs a TerraGroup Labs <i>access</i> keycard (consumed), usable from 1 minute after raid start.'
 };
 /* ============ STATE ============ */
-const S={map:null,leaf:null,cfg:null,groups:{},tile:null,cache:{},tasks:null,measure:{on:false,pts:[],line:null},pinMode:false,pins:JSON.parse(localStorage.getItem('tkm_pins')||'[]'),dead:JSON.parse(localStorage.getItem('tkm_dead')||'[]'),routes:JSON.parse(localStorage.getItem('tkm_routes')||'[]'),rdead:JSON.parse(localStorage.getItem('tkm_rdead')||'[]'),done:new Set(JSON.parse(localStorage.getItem('tkm_done')||'[]')),qdone:new Set(JSON.parse(localStorage.getItem('tkm_qdone')||'[]')),route:{on:false,pts:[],line:null},lvl:localStorage.getItem('tkm_lvl')||'',squad:localStorage.getItem('tkm_squad')||'',name:localStorage.getItem('tkm_name')||'',syncTimer:null,syncBusy:false};
+const S={map:null,leaf:null,cfg:null,groups:{},tile:null,cache:{},tasks:null,measure:{on:false,pts:[],line:null},pinMode:false,pins:JSON.parse(packGet('tkm_pins')||'[]'),dead:JSON.parse(packGet('tkm_dead')||'[]'),routes:JSON.parse(packGet('tkm_routes')||'[]'),rdead:JSON.parse(packGet('tkm_rdead')||'[]'),done:new Set(JSON.parse(packGet('tkm_done')||'[]')),qdone:new Set(JSON.parse(packGet('tkm_qdone')||'[]')),route:{on:false,pts:[],line:null},lvl:packGet('tkm_lvl')||'',squad:packGet('tkm_squad')||'',name:packGet('tkm_name')||'',syncTimer:null,syncBusy:false};
 S.pins.forEach(p=>{if(!p.id)p.id=Math.random().toString(36).slice(2,10);});
 function savePins(){localStorage.setItem('tkm_pins',JSON.stringify(S.pins));localStorage.setItem('tkm_dead',JSON.stringify(S.dead));localStorage.setItem('tkm_routes',JSON.stringify(S.routes));localStorage.setItem('tkm_rdead',JSON.stringify(S.rdead));}
 function saveDone(){localStorage.setItem('tkm_done',JSON.stringify([...S.done]));}
@@ -939,16 +939,24 @@ function hiPending(){
 }
 /* 🌐 hosted fallback: when the live API is down and nothing is cached, seed from the site's own datapack.json (if present) */
 let seedTried=false;
+window.__SEED=null;
 async function seedFromSite(){
   if(seedTried||location.protocol!=='https:')return false;
   seedTried=true;
   try{
-    const r=await fetch('datapack.json',{cache:'no-store'});
+    const r=await fetch('datapack.json');
     if(!r.ok)return false;
-    const o=await r.json();let n=0;
-    Object.entries(o).forEach(([k,v])=>{if(PACK_RE.test(k)&&typeof v==='string'&&!localStorage.getItem(k)){safeSet(k,v);n++;}});
-    return n>0;
+    const o=await r.json();
+    /* kept in MEMORY, not localStorage: browser storage quota (shared with the tile cache) was
+       silently rejecting these 1.9MB of writes and taking neighbouring caches down with them. */
+    window.__SEED=o;
+    return Object.keys(o).length>0;
   }catch(e){return false;}
+}
+/* read a cache entry: your own saved data first, then the site's bundled datapack */
+function packGet(k){
+  try{const v=localStorage.getItem(k);if(v)return v;}catch(e){}
+  try{return (window.__SEED&&window.__SEED[k])||null;}catch(e){return null;}
 }
 /* 📦 data pack: export your downloaded caches / import a friend's — makes a freshly-shared file work instantly.
    Includes EVERY game-data cache, any generation (older map caches still render fine) — never personal data. */
@@ -973,7 +981,7 @@ function packImport(){
         if(!n){alert('That file contained no usable data sets — make sure it\'s the tarkov-maps-datapack.json your friend exported.');return;}
         alert('Imported '+n+' data sets — opening the map now. (Markers come from the pack; the map IMAGERY still streams from the internet.)');
         try{showPage('map');}catch(e){} /* close any open full-screen page so the result is visible */
-        renderMap(S.cfg?S.cfg.id:(localStorage.getItem('tkm_last')||'ground-zero'),true);
+        renderMap(S.cfg?S.cfg.id:(packGet('tkm_last')||'ground-zero'),true);
       }catch(e){alert('That file isn\'t a valid data pack.');}
     };
     rd.readAsText(f);
@@ -1012,7 +1020,7 @@ function keyOpen(kn){
   let lockHit=null,lockMap=null;
   for(const mp of MAPS){
     try{
-      const c=JSON.parse(localStorage.getItem('tkm_c5_'+mp.id)||'null');
+      const c=JSON.parse(packGet('tkm_c5_'+mp.id)||'null');
       const l=keyBest(tk,((c&&c.d&&c.d.locks)||[]).filter(l=>l.key&&l.key.name),l=>l.key.name);
       if(l&&(!lockHit||keyScore(tk,l.key.name)>keyScore(tk,lockHit.key.name))){lockHit=l;lockMap=mp.id;}
     }catch(e){}
@@ -1251,7 +1259,7 @@ async function squadButton(){
 const CATS={extract:{label:"PMC Extracts",color:"var(--extract)"},scavx:{label:"Scav Extracts",color:"var(--scavx)"},transit:{label:"Transits",color:"var(--transit)"},quest:{label:"Quest Guide",color:"var(--quest)"},qapi:{label:"Quest Objectives (live)",color:"var(--qapi)"},key:{label:"Keys & Locks",color:"var(--key)"},loot:{label:"Loot",color:"var(--loot)"},hazard:{label:"Hazards",color:"var(--hazard)"},gun:{label:"Mounted Guns",color:"var(--gun)"},spawn:{label:"PMC Spawns",color:"var(--spawn)"},land:{label:"Landmarks",color:"var(--land)"},lbl:{label:"Place names",color:"#a9bad2"},sw:{label:"Switches",color:"#2dd4bf"},cont:{label:"Containers & stashes",color:"#6b7a90"},gem:{label:"Item spawns (notable)",color:"#f0abfc"},pin:{label:"My Pins",color:"var(--pin)"}};
 const DEF_ON={extract:1,scavx:0,transit:1,quest:1,qapi:0,key:1,loot:1,hazard:1,gun:1,spawn:0,land:1,lbl:1,sw:1,cont:0,gem:1,pin:1};
 const colorOf=c=>({extract:"#4ade80",scavx:"#7dd3fc",transit:"#a78bfa",quest:"#fbbf24",qapi:"#fde047",key:"#22d3ee",loot:"#fb923c",hazard:"#f87171",gun:"#facc15",spawn:"#e2e8f0",land:"#f472b6",lbl:"#a9bad2",sw:"#2dd4bf",cont:"#6b7a90",gem:"#f0abfc",pin:"#ffffff"})[c];
-function layerState(){try{return JSON.parse(localStorage.getItem('tkm_layers')||'{}')}catch(e){return{}}}
+function layerState(){try{return JSON.parse(packGet('tkm_layers')||'{}')}catch(e){return{}}}
 function saveLayerState(o){localStorage.setItem('tkm_layers',JSON.stringify(o))}
 
 /* ============ CRS ============ */
@@ -1296,7 +1304,7 @@ const MAP_Q=n=>`{maps(name:"${n}"){normalizedName raidDuration players descripti
 const fmt=n=>!n?'?':(n>=1e6?(n/1e6).toFixed(1)+'M':(n>=1e3?Math.round(n/1e3)+'k':Math.round(n)));
 const GOON_Q=`{goonReports(limit:15){map{normalizedName}timestamp}}`;
 async function loadGoons(){
-  try{const c=JSON.parse(localStorage.getItem('tkm_goons')||'null');if(c&&Date.now()-c.ts<1800000)return c.d;}catch(e){}
+  try{const c=JSON.parse(packGet('tkm_goons')||'null');if(c&&Date.now()-c.ts<1800000)return c.d;}catch(e){}
   try{const r=await gql(GOON_Q);try{safeSet('tkm_goons',JSON.stringify({ts:Date.now(),d:r.goonReports}));}catch(e){}return r.goonReports;}
   catch(e){return null;}
 }
@@ -1327,8 +1335,8 @@ async function loadMapData(cfg){
   /* SAVED-DATA-FIRST: any cached copy renders INSTANTLY; a stale one refreshes silently in the background.
      The network is only waited on when this map has never been loaded before. */
   let cached=null;
-  try{cached=JSON.parse(localStorage.getItem(ck)||'null');}catch(e){}
-  if(!cached){try{cached=JSON.parse(localStorage.getItem('tkm_c4_'+cfg.id)||'null');}catch(e){}}
+  try{cached=JSON.parse(packGet(ck)||'null');}catch(e){}
+  if(!cached){try{cached=JSON.parse(packGet('tkm_c4_'+cfg.id)||'null');}catch(e){}}
   if(cached&&cached.d){
     if(Date.now()-cached.ts<43200000){S.staleData=false;return cached.d;}
     S.staleData=true;
@@ -1349,13 +1357,13 @@ async function loadMapData(cfg){
   }
   /* API down: on the hosted site, seed from the repo's bundled datapack and retry the cache */
   if(await seedFromSite()){
-    try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&c.d){S.staleData=true;return c.d;}}catch(e){}
+    try{const c=JSON.parse(packGet(ck)||'null');if(c&&c.d){S.staleData=true;return c.d;}}catch(e){}
   }
   return null;
 }
 async function loadTasks(){
   if(S.tasks)return S.tasks;
-  let c=null;try{c=JSON.parse(localStorage.getItem('tkm_tasks3')||'null');}catch(e){}
+  let c=null;try{c=JSON.parse(packGet('tkm_tasks3')||'null');}catch(e){}
   if(c&&c.d){
     S.tasks=c.d;
     if(Date.now()-c.ts>=43200000)(async()=>{try{const r=await gql(TASKS_Q);S.tasks=r.tasks;safeSet('tkm_tasks3',JSON.stringify({ts:Date.now(),d:r.tasks}));}catch(e){}})();
@@ -2733,16 +2741,16 @@ document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>showPage(t.dataset.v
    datapack BEFORE anything renders — so the app is fully populated even while the live API is down. */
 (async()=>{
   try{
-    if(location.protocol==='https:'&&!localStorage.getItem('tkm_tasks3')){
+    if(location.protocol==='https:'&&!packGet('tkm_tasks3')){
       const w=document.getElementById('netwarn');
       if(w){w.innerHTML='⏳ First visit — loading the bundled game data…';w.style.display='block';}
       await seedFromSite();
       if(w)w.style.display='none';
     }
   }catch(e){}
-  let start=localStorage.getItem('tkm_last')||'ground-zero';
+  let start=packGet('tkm_last')||'ground-zero';
   /* if the starting map has no data yet and the API is unreachable, open one that does */
-  try{if(!localStorage.getItem('tkm_c5_'+start)){const m=MAPS.find(m=>localStorage.getItem('tkm_c5_'+m.id));if(m)start=m.id;}}catch(e){}
+  try{if(!packGet('tkm_c5_'+start)){const m=MAPS.find(m=>packGet('tkm_c5_'+m.id));if(m)start=m.id;}}catch(e){}
   renderMap(start);
   squadLoop();if(S.squad)setTimeout(()=>squadSync(false),3000);
 })();
