@@ -663,8 +663,8 @@ function llInfo(v){
   return {txt:' LL'+v.minTraderLevel+(pl?' (≈L'+pl+')':''),lvl:pl||1};
 }
 async function loadAmmo(){
-  try{const c=JSON.parse(packGet('tkm_ammo4')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
-  try{const r=await gql(AMMO_Q);try{safeSet('tkm_ammo4',JSON.stringify({ts:Date.now(),d:r.ammo}));}catch(e){}return r.ammo;}catch(e){return null;}
+  const __c=cacheRead('tkm_ammo4',43200000);if(__c&&__c.fresh)return __c.d;
+  try{const r=await gql(AMMO_Q);try{safeSet('tkm_ammo4',JSON.stringify({ts:Date.now(),d:r.ammo}));}catch(e){}return r.ammo;}catch(e){return __c?__c.d:null;}
 }
 function bestSeller(it){
   const offers=(it.buyFor||[]).filter(o=>o.vendor&&o.vendor.name!=='Flea Market');
@@ -683,14 +683,14 @@ async function itemSearch(q){
 }
 const HIDEOUT_Q=`{hideoutStations{name levels{level itemRequirements{count item{name avg24hPrice iconLink}}}}}`;
 async function loadHideout(){
-  try{const c=JSON.parse(packGet('tkm_hide3')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_hide3',43200000);if(__c&&__c.fresh)return __c.d;
   try{const r=await gql(HIDEOUT_Q);try{safeSet('tkm_hide3',JSON.stringify({ts:Date.now(),d:r.hideoutStations}));}catch(e){}return r.hideoutStations;}
-  catch(e){console.warn('hideout query failed',e);return null;}
+  catch(e){console.warn('hideout query failed');return __c?__c.d:null;}
 }
 /* ============ BULK DATA — one request per category (per-item lookups got burst rate-limited) ============ */
 const GUNS_Q=`{items(types:[gun]){name shortName iconLink gridImageLink image512pxLink avg24hPrice buyFor{priceRUB vendor{name}} properties{__typename ...on ItemPropertiesWeapon{caliber ergonomics recoilVertical fireRate}}}}`;
 async function loadGuns(){
-  try{const c=JSON.parse(packGet('tkm_guns1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_guns1',43200000);if(__c&&__c.fresh)return __c.d;
   try{
     const r=await gql(GUNS_Q);
     const d=(r.items||[]).map(g=>({n:g.name,sn:g.shortName,ic:g.iconLink,im:g.image512pxLink||g.gridImageLink||g.iconLink,p:g.avg24hPrice,
@@ -698,7 +698,7 @@ async function loadGuns(){
       pr:(g.properties&&g.properties.caliber)?{cal:g.properties.caliber,erg:g.properties.ergonomics,rec:g.properties.recoilVertical,rof:g.properties.fireRate}:null}));
     try{safeSet('tkm_guns1',JSON.stringify({ts:Date.now(),d}));}catch(e){}
     return d;
-  }catch(e){console.warn('guns query failed',e);return null;}
+  }catch(e){console.warn('guns query failed');return __c?__c.d:null;}
 }
 const GEAR_Q=`{armor:items(types:[armor]){name shortName iconLink avg24hPrice buyFor{priceRUB vendor{name}} properties{...on ItemPropertiesArmor{class durability material{name}}}}
 rig:items(types:[rig]){name shortName iconLink avg24hPrice buyFor{priceRUB vendor{name}} properties{...on ItemPropertiesChestRig{class capacity grids{width height}}}}
@@ -718,18 +718,18 @@ function gridSum(gr){
   return Object.entries(m).sort((a,b)=>{const [aw,ah]=a[0].split('×').map(Number),[bw,bh]=b[0].split('×').map(Number);return (bw*bh)-(aw*ah);}).map(([k,c])=>c+'× '+k).join(' · ');
 }
 async function loadGear(){
-  try{const c=JSON.parse(packGet('tkm_gear2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_gear2',43200000);if(__c&&__c.fresh)return __c.d;
   try{
     const r=await gql(GEAR_Q);
     const d={armor:trimGear(r.armor),rig:trimGear(r.rig),bp:trimGear(r.bp),helm:trimGear(r.helm)};
     try{safeSet('tkm_gear2',JSON.stringify({ts:Date.now(),d}));}catch(e){}
     return d;
-  }catch(e){console.warn('gear query failed',e);return null;}
+  }catch(e){console.warn('gear query failed');return __c?__c.d:null;}
 }
 /* ---- armor plates: live market + per-armor compatibility ---- */
 const PLATE_Q=`{items(types:[armorPlate]){name shortName iconLink avg24hPrice buyFor{priceRUB vendor{name ...on TraderOffer{minTraderLevel}}} properties{...on ItemPropertiesArmorAttachment{class durability material{name}}}}}`;
 async function loadPlates(){
-  try{const c=JSON.parse(packGet('tkm_plate1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_plate1',43200000);if(__c&&__c.fresh)return __c.d;
   try{
     const r=await gql(PLATE_Q);
     const d=(r.items||[]).map(x=>({n:x.name,sn:x.shortName,ic:x.iconLink,p:x.avg24hPrice||0,
@@ -738,7 +738,7 @@ async function loadPlates(){
       mat:(x.properties&&x.properties.material&&x.properties.material.name)||''}));
     try{safeSet('tkm_plate1',JSON.stringify({ts:Date.now(),d}));}catch(e){}
     return d;
-  }catch(e){console.warn('plates',e);return null;}
+  }catch(e){console.warn('plates');return __c?__c.d:null;}
 }
 async function plateSlots(q){
   const ck='ps:'+q.toLowerCase();
@@ -750,25 +750,25 @@ async function plateSlots(q){
   }catch(e){return null;}
 }
 async function loadBossPics(){
-  try{const c=JSON.parse(packGet('tkm_bossp')||'null');if(c&&Date.now()-c.ts<86400000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_bossp',86400000);if(__c&&__c.fresh)return __c.d;
   try{const r=await gql(`{bosses{name imagePortraitLink}}`);
     try{safeSet('tkm_bossp',JSON.stringify({ts:Date.now(),d:r.bosses}));}catch(e){}
-    return r.bosses;}catch(e){return null;}
+    return r.bosses;}catch(e){return __c?__c.d:null;}
 }
 /* ---- money-maker data: crafts, barters, junk values ---- */
 const CRAFT_Q=`{crafts{duration level station{name} requiredItems{count item{name avg24hPrice}} rewardItems{count item{name shortName avg24hPrice iconLink}}}}`;
 async function loadCrafts(){
-  try{const c=JSON.parse(packGet('tkm_craft1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
-  try{const r=await gql(CRAFT_Q);try{safeSet('tkm_craft1',JSON.stringify({ts:Date.now(),d:r.crafts}));}catch(e){}return r.crafts;}catch(e){console.warn('crafts',e);return null;}
+  const __c=cacheRead('tkm_craft1',43200000);if(__c&&__c.fresh)return __c.d;
+  try{const r=await gql(CRAFT_Q);try{safeSet('tkm_craft1',JSON.stringify({ts:Date.now(),d:r.crafts}));}catch(e){}return r.crafts;}catch(e){console.warn('crafts');return __c?__c.d:null;}
 }
 const BARTER_Q=`{barters{level trader{name} requiredItems{count item{name avg24hPrice}} rewardItems{count item{name shortName avg24hPrice iconLink}}}}`;
 async function loadBarters(){
-  try{const c=JSON.parse(packGet('tkm_bart1')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
-  try{const r=await gql(BARTER_Q);try{safeSet('tkm_bart1',JSON.stringify({ts:Date.now(),d:r.barters}));}catch(e){}return r.barters;}catch(e){console.warn('barters',e);return null;}
+  const __c=cacheRead('tkm_bart1',43200000);if(__c&&__c.fresh)return __c.d;
+  try{const r=await gql(BARTER_Q);try{safeSet('tkm_bart1',JSON.stringify({ts:Date.now(),d:r.barters}));}catch(e){}return r.barters;}catch(e){console.warn('barters');return __c?__c.d:null;}
 }
 const LOOT_Q=`{items(types:[barter]){name shortName iconLink basePrice width height avg24hPrice sellFor{priceRUB vendor{name}}}}`;
 async function loadLoot(){
-  try{const c=JSON.parse(packGet('tkm_loot2')||'null');if(c&&Date.now()-c.ts<43200000)return c.d;}catch(e){}
+  const __c=cacheRead('tkm_loot2',43200000);if(__c&&__c.fresh)return __c.d;
   try{
     const r=await gql(LOOT_Q);
     const d=(r.items||[]).map(it=>{
@@ -777,7 +777,7 @@ async function loadLoot(){
     });
     try{safeSet('tkm_loot2',JSON.stringify({ts:Date.now(),d}));}catch(e){}
     return d;
-  }catch(e){console.warn('loot',e);return null;}
+  }catch(e){console.warn('loot');return __c?__c.d:null;}
 }
 /* resolve many exact item names in a couple of aliased requests (for builds page) */
 async function batchItems(names){
@@ -954,6 +954,7 @@ async function seedFromSite(){
   }catch(e){return false;}
 }
 /* read a cache entry: your own saved data first, then the site's bundled datapack */
+function cacheRead(k,ttl){try{const c=JSON.parse(packGet(k)||'null');if(c&&c.d!==undefined)return {fresh:(Date.now()-c.ts)<ttl,d:c.d};}catch(e){}return null;}
 function packGet(k){
   try{const v=localStorage.getItem(k);if(v)return v;}catch(e){}
   try{return (window.__SEED&&window.__SEED[k])||null;}catch(e){return null;}
