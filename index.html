@@ -1349,8 +1349,6 @@ async function loadMapData(cfg){
   }
   /* API down: on the hosted site, seed from the repo's bundled datapack and retry the cache */
   if(await seedFromSite()){
-    /* one guarded reload so every loader (tasks, ammo, gear…) picks the seeded data up cleanly */
-    try{if(!sessionStorage.getItem('tkm_seeded')){sessionStorage.setItem('tkm_seeded','1');location.reload();return null;}}catch(e){}
     try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&c.d){S.staleData=true;return c.d;}}catch(e){}
   }
   return null;
@@ -2731,8 +2729,23 @@ function showPage(v){
   }
 }
 document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>showPage(t.dataset.v));
-renderMap(localStorage.getItem('tkm_last')||'ground-zero');
-squadLoop();if(S.squad)setTimeout(()=>squadSync(false),3000);
+/* BOOT: on the hosted site, a first-time visitor with no cached data gets seeded from the bundled
+   datapack BEFORE anything renders — so the app is fully populated even while the live API is down. */
+(async()=>{
+  try{
+    if(location.protocol==='https:'&&!localStorage.getItem('tkm_tasks3')){
+      const w=document.getElementById('netwarn');
+      if(w){w.innerHTML='⏳ First visit — loading the bundled game data…';w.style.display='block';}
+      await seedFromSite();
+      if(w)w.style.display='none';
+    }
+  }catch(e){}
+  let start=localStorage.getItem('tkm_last')||'ground-zero';
+  /* if the starting map has no data yet and the API is unreachable, open one that does */
+  try{if(!localStorage.getItem('tkm_c5_'+start)){const m=MAPS.find(m=>localStorage.getItem('tkm_c5_'+m.id));if(m)start=m.id;}}catch(e){}
+  renderMap(start);
+  squadLoop();if(S.squad)setTimeout(()=>squadSync(false),3000);
+})();
 /* PWA: when hosted (https), install the service worker for offline app-shell + map imagery caching. Harmless no-op on local file copies. */
 if('serviceWorker' in navigator&&location.protocol==='https:'){try{navigator.serviceWorker.register('sw.js');}catch(e){}}
 </script>
