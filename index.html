@@ -1349,6 +1349,8 @@ async function loadMapData(cfg){
   }
   /* API down: on the hosted site, seed from the repo's bundled datapack and retry the cache */
   if(await seedFromSite()){
+    /* one guarded reload so every loader (tasks, ammo, gear…) picks the seeded data up cleanly */
+    try{if(!sessionStorage.getItem('tkm_seeded')){sessionStorage.setItem('tkm_seeded','1');location.reload();return null;}}catch(e){}
     try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&c.d){S.staleData=true;return c.d;}}catch(e){}
   }
   return null;
