@@ -232,6 +232,7 @@ const MAPS=[
 {id:"lighthouse",label:"Lighthouse",api:["Lighthouse"],norms:["lighthouse"],svg:"https://assets.tarkov.dev/maps/svg/Lighthouse.svg",rot:180,bounds:[[515,-998],[-545,725]],mnz:1,mxz:6,layers:[],northDown:true},
 {id:"streets-of-tarkov",label:"Streets",api:["Streets of Tarkov"],norms:["streets-of-tarkov"],svg:"https://assets.tarkov.dev/maps/svg/StreetsOfTarkov.svg",rot:180,bounds:[[323,-295],[-280,532]],mnz:1,mxz:6,layers:[],northDown:true},
 {id:"the-lab",label:"The Lab",api:["The Lab","Lab"],norms:["the-lab"],t:[0.575,281.2,0.575,193.7],rot:270,bounds:[[-80,-477],[-287,-193]],mnz:2,mxz:6,ts:175,tile:"https://assets.tarkov.dev/maps/labs_v4/1st/{z}/{x}/{y}.png",layers:[["Second Level","https://assets.tarkov.dev/maps/labs_v4/2nd/{z}/{x}/{y}.png"],["Technical","https://assets.tarkov.dev/maps/labs_v4/technical/{z}/{x}/{y}.png"]],northDown:false},
+{id:"terminal",label:"Terminal",api:["Terminal"],norms:["terminal"],t:[0.20,0,0.20,0],rot:180,bounds:[[463,-580],[-433,475]],mnz:2,mxz:6,svg:"https://assets.tarkov.dev/maps/svg/Terminal.svg",layers:[],northDown:true},
 {id:"the-labyrinth",label:"Labyrinth",api:["The Labyrinth","Labyrinth"],norms:["the-labyrinth"],t:[2.115,85.5,2.115,128.0],rot:270,bounds:[[-52,-37],[53,76]],mnz:1,mxz:6,tile:"https://assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png",layers:[],northDown:false},
 ];
 /* synth transform for svg maps (rot 180 convention) */
@@ -240,8 +241,25 @@ MAPS.forEach(c=>{if(!c.t&&c.svg){const b=c.bounds,sx=Math.abs(b[0][0]-b[1][0]),s
 /* ============ CURATED DATA (Ground Zero & Customs) ============ */
 const GZg=(px,py)=>({x:249-(px-80)/3,z:(py-40)/3-124});
 const CUg=(px,py)=>({x:(px-40)/1.9-372,z:237-(py-40)/1.9});
-function cur(mapId,conv,arr){return arr.map(e=>{const g=e.gx!==undefined?{x:e.gx,z:e.gz}:conv(e.px,e.py);return {map:mapId,cat:e.cat,g:e.g,name:e.name,sub:e.sub,body:e.body,x:g.x,z:g.z,badge:e.badge};});}
+function cur(mapId,conv,arr){return arr.map(e=>{const g=e.gx!==undefined?{x:e.gx,z:e.gz}:conv(e.px,e.py);return {map:mapId,cat:e.cat,g:e.g,name:e.name,sub:e.sub,body:e.body,x:g.x,z:g.z,badge:e.badge,fb:e.fb};});}
 const CURATED=[
+/* ---- FALLBACK EXTRACTS: exact API coordinates captured before the outage. fb:1 = auto-hidden the moment live data returns ---- */
+...cur("woods",null,[
+{fb:1,gx:349.0,gz:358.6,cat:"extract",g:"O",name:"Outskirts",sub:"PMC · offline marker (exact coords)",body:"<p><b>HOW TO USE:</b> The NW classic — reliable walk-out for most spawns, no requirements. Stand in the zone, timer runs.</p><p style='font-size:10.5px;color:var(--dim)'>Offline fallback marker at the exact API position — live data (and any switches) reattach automatically when the community database recovers.</p>"},
+{fb:1,gx:-535.2,gz:287.1,cat:"extract",g:"U",name:"UN Roadblock",sub:"PMC · offline marker",body:"<p><b>HOW TO USE:</b> South-east road by the UN vehicles — standard walk-out when it's on your double-tap-O list.</p>"},
+{fb:1,gx:-557.3,gz:-67.0,cat:"extract",g:"N",name:"Northern UN Roadblock",sub:"PMC · offline marker",body:"<p><b>HOW TO USE:</b> The northern UN post — availability varies by raid; check your in-game list.</p>"},
+{fb:1,gx:-141.7,gz:446.8,cat:"extract",g:"R",name:"RUAF Gate",sub:"PMC · not every raid",body:"<p><b>HOW TO USE:</b> Not active every raid — confirm on your list before committing to the walk. No item needed when active.</p>"},
+{fb:1,gx:-389.2,gz:11.0,cat:"extract",g:"Z",name:"ZB-016",sub:"PMC · offline marker",body:"<p><b>HOW TO USE:</b> South bunker — go down the hatch, wait inside. No key, no requirements.</p>"},
+{fb:1,gx:447.2,gz:57.5,cat:"extract",g:"Z",name:"ZB-014",sub:"PMC · NEEDS ZB-014 KEY",body:"<p><b>HOW TO USE:</b> Locked bunker — you need the <b>ZB-014 key ON YOU</b> to open the door, and the exit is only active in some raids (check your list). The key is a WOODS key — cheap on flea, never consumed: buy one and it lives in your gamma forever. Bonus: the bunker inside has loose loot/weapon spawns worth a look even when the exit is closed.</p>"},
+{fb:1,gx:-485.3,gz:-504.1,cat:"extract",g:"V",name:"Bridge V-Ex",sub:"PAID CAR · offline marker",body:"<p><b>HOW TO USE:</b> Paid car at the bridge — bring roubles (≈5-8k), pay at the vehicle, 60s countdown, ONE use per raid, limited seats.</p>"},
+{fb:1,gx:574.0,gz:-85.3,cat:"extract",g:"P",name:"Power Line Passage (Flare)",sub:"SIGNAL EXIT · green flare",body:"<p><b>HOW TO USE:</b> Stand in the zone and fire a <b>GREEN flare</b> into the sky to start the timer. Bring the flare in your inventory.</p>"},
+{fb:1,gx:-730.4,gz:129.3,cat:"extract",g:"R",name:"Railway Bridge to Tarkov",sub:"PMC · spawn-side gated",body:"<p><b>HOW TO USE:</b> The 1.0 rail exit on the far west. It's <b>spawn-side gated</b> — if it isn't on your double-tap-O list at raid start, it's simply not yours this raid (this is the one that confused you before). Nothing you carry changes it.</p>"}]),
+...cur("ground-zero",null,[
+{fb:1,gx:-16.1,gz:335.1,cat:"extract",g:"N",name:"Nakatani Basement Stairs",sub:"PMC · offline marker",body:"<p><b>HOW TO USE:</b> Staircase in the back corner of the Nakatani construction building — green EXIT sign, go down. No requirements.</p>"},
+{fb:1,gx:218.2,gz:-38.5,cat:"extract",g:"M",name:"Mira Ave (Flare)",sub:"SIGNAL EXIT · green flare",body:"<p><b>HOW TO USE:</b> Fire a <b>GREEN flare</b> into the sky inside the signal area by the yellow bus. A Scav body on the bus holds one flare each raid. ⚠ Don't cross the blockade — border sniper.</p>"},
+{fb:1,gx:-19.5,gz:114.9,cat:"extract",g:"V",name:"Police Cordon V-Ex",sub:"PAID CAR · ~5,000₽",body:"<p><b>HOW TO USE:</b> Paid car — ≈5,000₽ per player, 60s timer, single use, max 4 seats. Completes Burning Rubber.</p>"},
+{fb:1,gx:190.8,gz:133.4,cat:"extract",g:"T",name:"Tartowers Sales Office",sub:"HIDDEN · needs code word note",body:"<p><b>HOW TO USE:</b> Hidden exit — requires the <b>Note with code word 'Adaptation'</b> (extraction intel item). By the flickering screen in the sales office.</p>"},
+{fb:1,gx:25.2,gz:-79.5,cat:"extract",g:"C",name:"Scav Checkpoint (Co-op)",sub:"CO-OP · PMC + player Scav",body:"<p><b>HOW TO USE:</b> Needs 1 PMC + 1 player-Scav standing together at the blockade. Solo PvE: treat as unavailable.</p>"}]),
 ...cur("ground-zero",GZg,[
 {px:346,py:141,cat:"quest",g:"★",name:"First in Line (Therapist)",sub:"Emercom camp + 3 FIR meds",body:"<p>Locate the Emercom medical camp, then hand any 3 found-in-raid meds to Therapist. The tents spawn meds.</p>"},
 {px:672,py:786,cat:"quest",g:"★",name:"Shooting Cans — Utyos (Prapor)",sub:"Tarbank 3F, door '5'",body:"<p>Locate the NSV Utyos: 3rd-floor office of Tarbank. Also locate the AGS + kill any 5 targets on GZ.</p>"},
@@ -575,6 +593,7 @@ const MAP_LABELS={"streets-of-tarkov":[[9,308,"Primorsky Ave.",80,1000,-1000],[9
 const SVGFLOORS={
 "interchange":{svg:"https://assets.tarkov.dev/maps/svg/Interchange.svg",ground:"Ground_Level",floors:[["2nd Floor","First_Floor"],["3rd Floor","Second_Floor"]]},
 "shoreline":{svg:"https://assets.tarkov.dev/maps/svg/Shoreline.svg",ground:"Ground_Level",floors:[["Underground","Underground_Level"],["2nd Floor","Second_Floor"],["3rd Floor","Third_Floor"]]},
+"terminal":{svg:"https://assets.tarkov.dev/maps/svg/Terminal.svg",ground:"Ground_Level",floors:[]},
 "streets-of-tarkov":{svg:"https://assets.tarkov.dev/maps/svg/StreetsOfTarkov.svg",ground:"Ground_Level",floors:[["Underground","Underground_Level"],["2nd Floor","Second_Floor"],["3rd Floor","Third_Floor"],["4th Floor","Fourth_Floor"],["5th Floor","Fifth_Floor"]]}};
 /* label height windows per floor (only where the data is floor-banded) */
 const FLOOR_WINDOWS={
@@ -910,6 +929,7 @@ const SPECIAL_NOTES={
 };
 /* per-map entry/exit guides shown in the Intel panel */
 const MAP_GUIDES={
+ terminal:'<b>THE STORY FINALE MAP</b> — the port, dominated by the docked <b>icebreaker ship</b> (the thing everyone calls the map by). Unlocked late in the 1.0 story chapters. Live extracts/locks attach to this map automatically when the community database syncs its data — until then you get the base layout for orientation.',
  'the-lab':'<b>TWO WAYS IN (1.0):</b> ① Select The Lab from the map screen — needs a <b>TerraGroup Labs access keycard</b>, consumed on entry (flea, barters, rare loot). ② <b>Transit from Streets</b> — the underground entrance on <b>Klimova St, the building with the cosmonaut mural</b>: take the stairs beside the building down to the basement metal door (the ⇄ transit marker on the Streets map). Opens 1 minute after raid start and STILL consumes an access keycard. Your first-ever visit is unlocked through the story "Tour" chapter.<br><br><b>YOUR YELLOW KEYCARD</b> is a room key <i>inside</i> Labs, not the entry ticket — its door is marked 🔑 on this map (type "yellow" in the 🔍 search to jump to it). Don\'t confuse it with the white <i>access</i> keycard.<br><br><b>EASIEST FIRST RAID:</b> go as a duo, learn the extracts BEFORE looting — click the lettered markers: several need switches/power, the vent shaft takes no backpack. Raiders respond to noise and objectives; walk, don\'t sprint, and never chase gunfire you didn\'t start. Loot one wing (yellow card room + med blocks), leave early, count it as a win.',
  factory:'<b>⇄ LABS ENTRANCE on this map (the easy one):</b> the Transit to The Lab door — see the ⇄ marker. Factory is tiny, so it\'s 2–3 minutes from any spawn: wait out the 1-minute raid timer, use the door, your TerraGroup Labs <i>access</i> keycard is consumed, and you continue into Labs with your current kit. Also has transits to Woods and Customs.',
  'streets-of-tarkov':'<b>⇄ LABS ENTRANCE on this map:</b> Klimova St — the building with the <b>cosmonaut mural</b>; the stairwell beside it leads down to a basement metal door (see the ⇄ transit marker, or search "lab" in 🔍). Needs a TerraGroup Labs <i>access</i> keycard (consumed), usable from 1 minute after raid start.'
@@ -1546,7 +1566,7 @@ async function trackScan(){
 }
 /* ============ AUTO MAP DETECTION (game log watch) ============ */
 let logTimer=null,logDir=null,logOffsets={};
-const LOGMAP={bigmap:'customs',Sandbox_high:'ground-zero',Sandbox:'ground-zero',Interchange:'interchange',Woods:'woods',Shoreline:'shoreline',RezervBase:'reserve',Laboratory:'the-lab',Lighthouse:'lighthouse',TarkovStreets:'streets-of-tarkov',factory4_day:'factory',factory4_night:'factory',Labyrinth:'the-labyrinth'};
+const LOGMAP={bigmap:'customs',Sandbox_high:'ground-zero',Sandbox:'ground-zero',Interchange:'interchange',Woods:'woods',Shoreline:'shoreline',RezervBase:'reserve',Laboratory:'the-lab',Lighthouse:'lighthouse',TarkovStreets:'streets-of-tarkov',factory4_day:'factory',factory4_night:'factory',Labyrinth:'the-labyrinth',Terminal:'terminal'};
 const LOGRE=new RegExp('\\b('+Object.keys(LOGMAP).join('|')+')\\b','g');
 async function logToggle(){
   const btn=document.getElementById('logbtn');
@@ -2002,6 +2022,7 @@ async function renderMap(id,keepView){
   }
   /* curated */
   CURATED.filter(c=>c.map===cfg.id).forEach(c=>{
+    if(c.fb&&data&&data.extracts&&data.extracts.length)return; /* fallback marker: live data supersedes it */
     if(S.focus&&c.cat==='quest'&&!inFocus(c.name))return;
     let bd=c.body;
     if(/key|keycard/i.test(c.name)&&(c.cat==='gem'||c.cat==='key')){
