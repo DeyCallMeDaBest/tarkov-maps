@@ -1263,7 +1263,7 @@ async function squadButton(){
   }
 }
 const CATS={extract:{label:"PMC Extracts",color:"var(--extract)"},scavx:{label:"Scav Extracts",color:"var(--scavx)"},transit:{label:"Transits",color:"var(--transit)"},quest:{label:"Quest Guide",color:"var(--quest)"},qapi:{label:"Quest Objectives (live)",color:"var(--qapi)"},key:{label:"Keys & Locks",color:"var(--key)"},loot:{label:"Loot",color:"var(--loot)"},hazard:{label:"Hazards",color:"var(--hazard)"},gun:{label:"Mounted Guns",color:"var(--gun)"},spawn:{label:"PMC Spawns",color:"var(--spawn)"},land:{label:"Landmarks",color:"var(--land)"},lbl:{label:"Place names",color:"#a9bad2"},sw:{label:"Switches",color:"#2dd4bf"},cont:{label:"Containers & stashes",color:"#6b7a90"},gem:{label:"Item spawns (notable)",color:"#f0abfc"},pin:{label:"My Pins",color:"var(--pin)"}};
-const DEF_ON={extract:1,scavx:0,transit:1,quest:1,qapi:0,key:1,loot:1,hazard:1,gun:1,spawn:0,land:1,lbl:1,sw:1,cont:0,gem:1,pin:1};
+const DEF_ON={extract:1,scavx:0,transit:1,quest:1,qapi:1,key:1,loot:1,hazard:1,gun:1,spawn:0,land:1,lbl:1,sw:1,cont:0,gem:1,pin:1};
 const colorOf=c=>({extract:"#4ade80",scavx:"#7dd3fc",transit:"#a78bfa",quest:"#fbbf24",qapi:"#fde047",key:"#22d3ee",loot:"#fb923c",hazard:"#f87171",gun:"#facc15",spawn:"#e2e8f0",land:"#f472b6",lbl:"#a9bad2",sw:"#2dd4bf",cont:"#6b7a90",gem:"#f0abfc",pin:"#ffffff"})[c];
 function layerState(){try{return JSON.parse(packGet('tkm_layers')||'{}')}catch(e){return{}}}
 function saveLayerState(o){localStorage.setItem('tkm_layers',JSON.stringify(o))}
@@ -2044,6 +2044,7 @@ async function renderMap(id,keepView){
             return `<p${here}>• ${(oo.description||oo.type||'').replace(/</g,'&lt;')}${itn}${cnt}${fir}${omaps}</p>`;
           }).join('');
           const m=addMarker('qapi',[p.z,p.x],t.name,(t.trader?t.trader.name:'')+(t.minPlayerLevel?' · lvl '+t.minPlayerLevel:''),`<p style="color:#fde047;font-weight:700;font-size:11px;letter-spacing:.5px">FULL TASK — the highlighted step is at THIS marker</p>${allObj}<p style="color:var(--dim);font-size:11px">Given by ${t.trader?t.trader.name:'?'}${t.minPlayerLevel?' at level '+t.minPlayerLevel:''} · 🎯 use Mission Focus (search the task in 🔍) for routes from your spawn</p><p><a href="https://escapefromtarkov.fandom.com/wiki/${encodeURIComponent(t.name.replace(/ /g,'_'))}" target="_blank" style="font-size:11px;color:var(--dim)">wiki (backup) ↗</a></p>`);
+          if(items&&items.qapi)items.qapi.push(m); /* searchable + counted like every other marker */
           if(S.focus)S.focusPts.push({ll:[p.z,p.x],name:t.name});
         });
       });
