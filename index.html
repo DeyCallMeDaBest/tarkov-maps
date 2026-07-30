@@ -1600,6 +1600,9 @@ document.addEventListener('click',e=>{
 /* ============ MAIN RENDER ============ */
 async function renderMap(id,keepView){
   const cfg=MAPS.find(m=>m.id===id);S.cfg=cfg;
+  /* fresh render = clean slate for banners & any pending auto-retry from a previous map */
+  try{clearInterval(S.retryT);}catch(e){}
+  try{const w0=document.getElementById('netwarn');if(w0)w0.style.display='none';}catch(e){}
   localStorage.setItem('tkm_last',id);
   document.querySelectorAll('.mp').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
   document.getElementById('loading').style.display='block';
@@ -1630,7 +1633,7 @@ async function renderMap(id,keepView){
       S.tile=L.imageOverlay(cfg.svg,llb,{pane:'basePane',attribution:'map art © tarkov.dev community (CC BY-NC-SA) · game © Battlestate Games · fan-made personal reference'});
     }else{
       S.tile=L.tileLayer(url||cfg.tile,{tileSize:cfg.ts||256,bounds:llb.pad(0.35),minZoom:cfg.mnz-0.5,maxNativeZoom:cfg.mxz,maxZoom:cfg.mxz+1.5,noWrap:true,keepBuffer:6,attribution:'imagery © Battlestate Games · tiles via tarkov.dev (CC BY-NC-SA) · fan-made personal reference'});
-      S.tile.on('tileerror',()=>{if(!tileLoaded&&++tileErrors>=6){const w=document.getElementById('netwarn');w.textContent='⚠ Imagery failed to load — check your internet connection (assets.tarkov.dev).';w.style.display='block';}});
+      S.tile.on('tileerror',()=>{if(!tileLoaded&&++tileErrors>=6){const w=document.getElementById('netwarn');if(w.style.display==='block')return;/* never clobber a data banner */w.textContent='⚠ Imagery failed to load — check your internet connection (assets.tarkov.dev).';w.style.display='block';}});
       S.tile.on('tileload',()=>{tileLoaded=true;document.getElementById('netwarn').style.display='none';tileErrors=0;});
     }
     S.tile.addTo(leaf);
@@ -1889,7 +1892,11 @@ async function renderMap(id,keepView){
     w.style.display='block';
     w.onclick=()=>{clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);};
     clearInterval(S.retryT);let left=secs;
-    S.retryT=setInterval(()=>{left--;const el=document.getElementById('rtn');if(el)el.textContent=left;if(left<=0){clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);}},1000);
+    S.retryT=setInterval(()=>{
+      if(!S.cfg||S.cfg.id!==cfg.id){clearInterval(S.retryT);return;} /* user moved on — never retry a map they left */
+      left--;const el=document.getElementById('rtn');if(el)el.textContent=left;
+      if(left<=0){clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);}
+    },1000);
   }
   else if(S.staleData){S.retryN=0;const w=document.getElementById('netwarn');w.innerHTML='ℹ Loaded instantly from saved data — refreshing prices in the background.';w.style.display='block';w.onclick=()=>{w.style.display='none';};setTimeout(()=>{if(w.textContent.startsWith('ℹ'))w.style.display='none';},6000);}
   else{S.retryN=0;}
@@ -2742,11 +2749,14 @@ document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>showPage(t.dataset.v
    datapack BEFORE anything renders — so the app is fully populated even while the live API is down. */
 (async()=>{
   try{
-    if(location.protocol==='https:'&&!packGet('tkm_tasks3')){
+    if(location.protocol==='https:'){
+      /* ALWAYS arm the in-memory bundle on the hosted site — it backstops every loader,
+         including browsers with partial/evicted storage (the "markers randomly missing" case) */
+      const first=!packGet('tkm_tasks3');
       const w=document.getElementById('netwarn');
-      if(w){w.innerHTML='⏳ First visit — loading the bundled game data…';w.style.display='block';}
+      if(first&&w){w.innerHTML='⏳ First visit — loading the bundled game data…';w.style.display='block';}
       await seedFromSite();
-      if(w)w.style.display='none';
+      if(first&&w)w.style.display='none';
     }
   }catch(e){}
   let start=packGet('tkm_last')||'ground-zero';
