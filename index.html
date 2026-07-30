@@ -75,7 +75,12 @@
   #detail a{color:#7dd3fc}
   #detail .close{position:absolute;top:8px;right:10px;background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer}
   #detail button.del{margin-top:4px;padding:4px 10px;border:1px solid #7a3a3a;background:#3a1f1f;color:#f0c0c0;border-radius:6px;cursor:pointer;font-size:12px}
-  #netwarn{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:#3a1f1f;border:1px solid #7a3a3a;color:#f0c0c0;padding:8px 14px;border-radius:8px;font-size:12px;z-index:1001;display:none;max-width:80%}
+  #netwarn{position:absolute;left:50%;top:14px;transform:translateX(-50%);padding:8px 32px 8px 14px;border-radius:8px;font-size:12px;z-index:1001;display:none;max-width:80%;line-height:1.5;border:1px solid #46523c;background:#1d2418;color:#cfe3b8}
+  #netwarn.nw-info{background:#1d2418;border-color:#46523c;color:#cfe3b8}
+  #netwarn.nw-warn{background:#2c2414;border-color:#8a763a;color:#f0e0b0}
+  #netwarn.nw-err{background:#3a1f1f;border-color:#7a3a3a;color:#f0c0c0}
+  .nwx{position:absolute;right:9px;top:7px;cursor:pointer;opacity:.65;font-weight:700}
+  .nwx:hover{opacity:1}
   #loading{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--dim);font-size:13px;z-index:999;background:rgba(14,17,22,.85);padding:10px 18px;border-radius:8px;display:none}
   #coords{position:absolute;left:10px;bottom:10px;z-index:1000;font-size:11px;color:var(--dim);background:rgba(22,27,34,.85);padding:3px 8px;border-radius:6px}
   #focusbar{position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:1001;background:rgba(30,26,10,.95);border:1.5px solid var(--quest);color:#ffe9a8;padding:8px 14px;border-radius:8px;font-size:12.5px;display:none;max-width:82%;text-align:center}
@@ -1343,7 +1348,7 @@ async function loadMapData(cfg){
     S.staleData=true;
     (async()=>{ /* background revalidate — next open of this map is fresh */
       for(const n of cfg.api){
-        try{const r=await gql(MAP_Q(n));if(r.maps&&r.maps.length){safeSet(ck,JSON.stringify({ts:Date.now(),d:r.maps[0]}));const w=document.getElementById('netwarn');if(w&&w.textContent.startsWith('ℹ'))w.style.display='none';return;}}catch(e){}
+        try{const r=await gql(MAP_Q(n));if(r.maps&&r.maps.length){safeSet(ck,JSON.stringify({ts:Date.now(),d:r.maps[0]}));const w=document.getElementById('netwarn');if(w&&w.className==='nw-info')w.style.display='none';return;}}catch(e){}
       }
     })();
     return cached.d;
@@ -1598,11 +1603,20 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('.popbtn'))document.querySelectorAll('.pop.open').forEach(p=>p.classList.remove('open'));
 });
 /* ============ MAIN RENDER ============ */
+/* one banner system: info (olive, self-dismisses) - warn (amber) - err (red, real failures only). Always dismissible. */
+function note(kind,html,ttl){
+  const w=document.getElementById('netwarn');if(!w)return null;
+  w.className='nw-'+kind;
+  w.innerHTML='<span class="nwx" title="dismiss" onclick="this.parentNode.style.display=\'none\'">&#10005;</span>'+html;
+  w.style.display='block';w.onclick=null;
+  clearTimeout(w._t);if(ttl)w._t=setTimeout(()=>{w.style.display='none';},ttl);
+  return w;
+}
 async function renderMap(id,keepView){
   const cfg=MAPS.find(m=>m.id===id);S.cfg=cfg;
   /* fresh render = clean slate for banners & any pending auto-retry from a previous map */
   try{clearInterval(S.retryT);}catch(e){}
-  try{const w0=document.getElementById('netwarn');if(w0)w0.style.display='none';}catch(e){}
+  try{const w0=document.getElementById('netwarn');if(w0){w0.style.display='none';w0.className='';}}catch(e){}
   localStorage.setItem('tkm_last',id);
   document.querySelectorAll('.mp').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
   document.getElementById('loading').style.display='block';
@@ -1633,8 +1647,7 @@ async function renderMap(id,keepView){
       S.tile=L.imageOverlay(cfg.svg,llb,{pane:'basePane',attribution:'map art © tarkov.dev community (CC BY-NC-SA) · game © Battlestate Games · fan-made personal reference'});
     }else{
       S.tile=L.tileLayer(url||cfg.tile,{tileSize:cfg.ts||256,bounds:llb.pad(0.35),minZoom:cfg.mnz-0.5,maxNativeZoom:cfg.mxz,maxZoom:cfg.mxz+1.5,noWrap:true,keepBuffer:6,attribution:'imagery © Battlestate Games · tiles via tarkov.dev (CC BY-NC-SA) · fan-made personal reference'});
-      S.tile.on('tileerror',()=>{if(!tileLoaded&&++tileErrors>=6){const w=document.getElementById('netwarn');if(w.style.display==='block')return;/* never clobber a data banner */w.textContent='⚠ Imagery failed to load — check your internet connection (assets.tarkov.dev).';w.style.display='block';}});
-      S.tile.on('tileload',()=>{tileLoaded=true;document.getElementById('netwarn').style.display='none';tileErrors=0;});
+      S.tile.on('tileerror',()=>{if(!tileLoaded&&++tileErrors>=6){const w=document.getElementById('netwarn');if(w&&w.style.display==='block')return;note('warn','<b>Map imagery is not loading.</b> Tiles stream from assets.tarkov.dev - usually no internet, or that server is briefly down. Markers and all pages still work; imagery appears once it is reachable again.');}});
     }
     S.tile.addTo(leaf);
   }
@@ -1887,10 +1900,8 @@ async function renderMap(id,keepView){
   if(!data){
     S.retryN=(S.retryN||0)+1;
     const secs=Math.min(60,10*S.retryN);
-    const w=document.getElementById('netwarn');
-    w.innerHTML=`⚠ First download of this map's live data didn't get through (busy API or no internet). Curated markers still show. Auto-retrying in <b id="rtn">${secs}</b>s — <u style="cursor:pointer">retry now</u> · or import a friend's 📦 Data pack (toggle bar) for instant data.`;
-    w.style.display='block';
-    w.onclick=()=>{clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);};
+    const w=note('warn',`<b>Why this popup:</b> this map's LIVE layer (extracts, locked doors, spawns, prices) could not download - the community database is refusing connections, and this map is not in the offline bundle. <b>Curated markers, missions, keys and search all still work.</b> Auto-retry in <b id="rtn">${secs}</b>s - <u id="rtnow" style="cursor:pointer">retry now</u>`);
+    const rn=document.getElementById('rtnow');if(rn)rn.onclick=e=>{e.stopPropagation();clearInterval(S.retryT);renderMap(cfg.id,true);};
     clearInterval(S.retryT);let left=secs;
     S.retryT=setInterval(()=>{
       if(!S.cfg||S.cfg.id!==cfg.id){clearInterval(S.retryT);return;} /* user moved on — never retry a map they left */
@@ -1898,7 +1909,7 @@ async function renderMap(id,keepView){
       if(left<=0){clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);}
     },1000);
   }
-  else if(S.staleData){S.retryN=0;const w=document.getElementById('netwarn');w.innerHTML='ℹ Loaded instantly from saved data — refreshing prices in the background.';w.style.display='block';w.onclick=()=>{w.style.display='none';};setTimeout(()=>{if(w.textContent.startsWith('ℹ'))w.style.display='none';},6000);}
+  else if(S.staleData){S.retryN=0;note('info','Loaded instantly from your saved data - the live database is busy right now, nothing is missing, prices may be a few hours old. Refreshing silently in the background.',7000);}
   else{S.retryN=0;}
   const items={extract:[],scavx:[],transit:[],quest:[],qapi:[],key:[],loot:[],hazard:[],gun:[],spawn:[],land:[],sw:[],cont:[],gem:[],pin:[]};
   const seen=new Set();
@@ -2754,7 +2765,7 @@ document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>showPage(t.dataset.v
          including browsers with partial/evicted storage (the "markers randomly missing" case) */
       const first=!packGet('tkm_tasks3');
       const w=document.getElementById('netwarn');
-      if(first&&w){w.innerHTML='⏳ First visit — loading the bundled game data…';w.style.display='block';}
+      if(first&&w){note('info','First visit - downloading the bundled game data (about 2 MB, a few seconds). After this the app opens instantly, even offline.');}
       await seedFromSite();
       if(first&&w)w.style.display='none';
     }
