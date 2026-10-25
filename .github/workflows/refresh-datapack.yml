@@ -13,12 +13,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Build datapack from live API
+      - name: Build datapack from tarkov.dev JSON feed
         run: node scripts/build-datapack.mjs
       - name: Commit if changed
         run: |
           git config user.name "datapack-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add datapack.json
-          git diff --cached --quiet || git commit -m "Auto-refresh datapack ($(date -u +%Y-%m-%dT%H:%M))"
+          git add datapack.json items.json
+          git diff --cached --quiet || git commit -m "Auto-refresh game data ($(date -u +%Y-%m-%dT%H:%M))"
           git push
