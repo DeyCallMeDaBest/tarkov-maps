@@ -1749,7 +1749,10 @@ async function renderMap(id,keepView){
       S.tile=L.imageOverlay(cfg.svg,llb,{pane:'basePane',attribution:'map art © tarkov.dev community (CC BY-NC-SA) · game © Battlestate Games · fan-made personal reference'});
     }else{
       S.tile=L.tileLayer(url||cfg.tile,{tileSize:cfg.ts||256,bounds:llb.pad(0.35),minZoom:cfg.mnz-0.5,maxNativeZoom:cfg.mxz,maxZoom:cfg.mxz+1.5,noWrap:true,keepBuffer:6,attribution:'imagery © Battlestate Games · tiles via tarkov.dev (CC BY-NC-SA) · fan-made personal reference'});
-      S.tile.on('tileerror',()=>{if(!tileLoaded&&++tileErrors>=6){const w=document.getElementById('netwarn');if(w&&w.style.display==='block')return;note('warn','<b>Map imagery is not loading.</b> Tiles stream from assets.tarkov.dev - usually no internet, or that server is briefly down. Markers and all pages still work; imagery appears once it is reachable again.');}});
+      /* a few missing tiles are normal (small maps like Icebreaker only have imagery around the ship) —
+         warn only when NOTHING has loaded after several failures */
+      S.tile.on('tileload',()=>{tileLoaded=true;});
+      S.tile.on('tileerror',()=>{if(tileLoaded||++tileErrors!==6)return;setTimeout(()=>{if(tileLoaded)return;const w=document.getElementById('netwarn');if(w&&w.style.display==='block')return;note('warn','<b>Map imagery is not loading.</b> Tiles stream from assets.tarkov.dev - usually no internet, or that server is briefly down. Markers and all pages still work; imagery appears once it is reachable again.');},3000);});
     }
     S.tile.addTo(leaf);
   }
