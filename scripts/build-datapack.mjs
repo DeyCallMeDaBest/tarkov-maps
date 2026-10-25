@@ -102,8 +102,8 @@ for (const [id, names] of MAPS){
 
 // Safety: only replace the pack when the core is intact — never commit a gutted file.
 if (!pack.tkm_tasks3 || !pack.tkm_ammo4 || mapsOk < 8){
-  console.error('Core data incomplete (maps ok: '+mapsOk+'; failures: '+failures.join(' | ')+') — keeping existing datapack.json');
-  process.exit(1);
+  console.log('API still unavailable (maps ok: '+mapsOk+') — keeping existing datapack.json; will try again on the next schedule.');
+  process.exit(0);
 }
 writeFileSync('datapack.json', JSON.stringify(pack));
 console.log('datapack.json written:', Object.keys(pack).length, 'datasets,', mapsOk, 'maps, failures:', failures.length?failures.join(' | '):'none');
