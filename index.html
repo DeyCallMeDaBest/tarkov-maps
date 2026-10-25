@@ -234,6 +234,7 @@ const MAPS=[
 {id:"the-lab",label:"The Lab",api:["The Lab","Lab"],norms:["the-lab"],t:[0.575,281.2,0.575,193.7],rot:270,bounds:[[-80,-477],[-287,-193]],mnz:2,mxz:6,ts:175,tile:"https://assets.tarkov.dev/maps/labs_v4/1st/{z}/{x}/{y}.png",layers:[["Second Level","https://assets.tarkov.dev/maps/labs_v4/2nd/{z}/{x}/{y}.png"],["Technical","https://assets.tarkov.dev/maps/labs_v4/technical/{z}/{x}/{y}.png"]],northDown:false},
 {id:"terminal",label:"Terminal",api:["Terminal"],norms:["terminal"],t:[0.20,0,0.20,0],rot:180,bounds:[[463,-580],[-433,475]],mnz:2,mxz:6,svg:"https://assets.tarkov.dev/maps/svg/Terminal.svg",layers:[],northDown:true},
 {id:"the-labyrinth",label:"Labyrinth",api:["The Labyrinth","Labyrinth"],norms:["the-labyrinth"],t:[2.115,85.5,2.115,128.0],rot:270,bounds:[[-52,-37],[53,76]],mnz:1,mxz:6,tile:"https://assets.tarkov.dev/maps/labyrinth/main/{z}/{x}/{y}.png",layers:[],northDown:false},
+{id:"icebreaker",label:"Icebreaker",api:["Icebreaker"],norms:["icebreaker"],t:[2.0,125.0,3.5,91.0],rot:180,bounds:[[77,-64.5],[-65.5,67.4]],mnz:1,mxz:5,compass:false,baseName:"Infirmary deck",tile:"https://assets.tarkov.dev/maps/icebreaker/06_infirmary/{z}/{x}/{y}.png",layers:[["Helipad","https://assets.tarkov.dev/maps/icebreaker/07_helipad/{z}/{x}/{y}.png"],["Gym / Canteen","https://assets.tarkov.dev/maps/icebreaker/08_gym-canteen/{z}/{x}/{y}.png"],["Accommodation (lower)","https://assets.tarkov.dev/maps/icebreaker/09_accommodation_lower/{z}/{x}/{y}.png"],["Accommodation (mid)","https://assets.tarkov.dev/maps/icebreaker/10_accommodation_mid/{z}/{x}/{y}.png"],["Accommodation (upper)","https://assets.tarkov.dev/maps/icebreaker/11_accommodation_upper/{z}/{x}/{y}.png"],["Officers' Deck","https://assets.tarkov.dev/maps/icebreaker/12_officers_deck/{z}/{x}/{y}.png"],["Stairs (blocked)","https://assets.tarkov.dev/maps/icebreaker/13_stairs_blocked/{z}/{x}/{y}.png"],["Bridge","https://assets.tarkov.dev/maps/icebreaker/14_bridge/{z}/{x}/{y}.png"],["Bridge Roof","https://assets.tarkov.dev/maps/icebreaker/15_bridge_roof/{z}/{x}/{y}.png"],["Control Room","https://assets.tarkov.dev/maps/icebreaker/00_control_room/{z}/{x}/{y}.png"],["Engine Room","https://assets.tarkov.dev/maps/icebreaker/01_engine_room/{z}/{x}/{y}.png"],["Engine Room (upper)","https://assets.tarkov.dev/maps/icebreaker/02_engine_room_upper/{z}/{x}/{y}.png"],["Fuel Pumps (lower)","https://assets.tarkov.dev/maps/icebreaker/03_fuel_pumps_lower/{z}/{x}/{y}.png"],["Fuel Pumps","https://assets.tarkov.dev/maps/icebreaker/04_fuel_pumps/{z}/{x}/{y}.png"],["Storage / Security","https://assets.tarkov.dev/maps/icebreaker/05_storage_ecurity/{z}/{x}/{y}.png"]],northDown:true},
 ];
 /* synth transform for svg maps (rot 180 convention) */
 MAPS.forEach(c=>{if(!c.t&&c.svg){const b=c.bounds,sx=Math.abs(b[0][0]-b[1][0]),sz=Math.abs(b[0][1]-b[1][1]);const a=256/Math.max(sx,sz);c.t=[a,a*b[0][0],a,-a*b[0][1]];}});
@@ -681,8 +682,10 @@ function safeSet(k,v){
   kill.forEach(k=>localStorage.removeItem(k));
 }catch(e){}})();
 const AMMO_Q=`{ammo{caliber penetrationPower damage initialSpeed item{name iconLink avg24hPrice buyFor{priceRUB vendor{name ...on TraderOffer{minTraderLevel}}}}}}`;
-/* trader loyalty level → approx required PLAYER level (PvE, 1.0 era; rep+spend also needed) */
-const TRADER_LVL={'Prapor':[1,15,26,36],'Therapist':[1,13,24,35],'Skier':[1,15,28,40],'Peacekeeper':[1,14,23,37],'Mechanic':[1,20,30,40],'Ragman':[1,17,32,46],'Jaeger':[1,15,22,33],'Ref':[1,15,25,35]};
+/* trader loyalty level → required PLAYER level (patch 1.2 values from tarkov.dev; reputation is also needed).
+   Overwritten at boot by the datapack's tkm_trd1 whenever the site has a newer table. */
+const TRADER_LVL={'Prapor':[1,6,21,36],'Therapist':[1,5,18,37],'Skier':[1,7,22,38],'Peacekeeper':[1,8,19,37],'Mechanic':[1,12,26,40],'Ragman':[1,12,27,42],'Jaeger':[1,9,17,33],'Ref':[1,15,25,35]};
+function applyTraderTable(){try{const c=JSON.parse(packGet('tkm_trd1')||'null');if(c&&c.d)Object.keys(c.d).forEach(n=>{if(Array.isArray(c.d[n])&&c.d[n].length===4)TRADER_LVL[n]=c.d[n];});}catch(e){}}
 function llInfo(v){
   if(!v||!v.minTraderLevel||v.minTraderLevel<=1)return {txt:'',lvl:1};
   const t=TRADER_LVL[v.name],pl=t?t[v.minTraderLevel-1]:null;
@@ -700,12 +703,38 @@ function bestSeller(it){
 }
 /* live item & attachment lookup for the omnibox */
 const itemCache=new Map();
+/* full item index (≈5,000 items: names, prices, trader offers, categories, short descriptions). Built every 6h
+   from tarkov.dev alongside the datapack; fetched ONCE on first use (hosted site) and kept in memory. */
+let _itemsIdx=null,_itemsP=null;
+function itemsIndex(){
+  if(_itemsIdx)return Promise.resolve(_itemsIdx);
+  if(_itemsP)return _itemsP;
+  _itemsP=(async()=>{
+    try{if(location.protocol==='https:'){const r=await fetch('items.json');if(r.ok){const o=await r.json();if(o&&Array.isArray(o.d)){_itemsIdx=o.d;return _itemsIdx;}}}}catch(e){}
+    _itemsIdx=[];return _itemsIdx;
+  })();
+  return _itemsP;
+}
+/* compact index entry → the item shape the UI already understands */
+function idxItem(x){
+  return {name:x.n,shortName:x.sn,description:x.d||'',iconLink:x.id?'https://assets.tarkov.dev/'+x.id+'-icon.webp':null,avg24hPrice:x.p||null,
+    wikiLink:'https://escapefromtarkov.fandom.com/wiki/'+encodeURIComponent(x.n.replace(/ /g,'_')),category:{name:x.c||''},buyFor:x.bf||[],noFlea:!!x.nf,size:x.sz||[1,1],types:x.t||[]};
+}
 async function itemSearch(q){
-  if(itemCache.has(q))return itemCache.get(q);
-  try{
-    const r=await gql(`{items(name:${JSON.stringify(q)},limit:5){name shortName description iconLink avg24hPrice wikiLink category{name} buyFor{priceRUB vendor{name}}}}`);
-    itemCache.set(q,r.items||[]);return r.items||[];
-  }catch(e){return [];}
+  const Q=(q||'').toLowerCase().trim();
+  if(itemCache.has(Q))return itemCache.get(Q);
+  const idx=await itemsIndex();
+  let out=[];
+  if(idx.length){
+    /* rank: exact name/short name → starts with → contains → typo-tolerant word match */
+    const score=x=>{const n=x.n.toLowerCase(),s=(x.sn||'').toLowerCase();
+      if(n===Q||s===Q)return 0;if(n.startsWith(Q)||s.startsWith(Q))return 1;if(n.includes(Q)||s.includes(Q))return 2;if(fz(x.n+' '+(x.sn||''),Q))return 3;return 9;};
+    out=idx.map(x=>[score(x),x]).filter(a=>a[0]<9).sort((a,b)=>a[0]-b[0]||(b[1].p||0)-(a[1].p||0)).slice(0,6).map(a=>idxItem(a[1]));
+  }else{
+    /* no index (local file copy) → last resort: the live API, which may be offline */
+    try{const r=await gql(`{items(name:${JSON.stringify(q)},limit:5){name shortName description iconLink avg24hPrice wikiLink category{name} buyFor{priceRUB vendor{name}}}}`);out=r.items||[];}catch(e){}
+  }
+  itemCache.set(Q,out);return out;
 }
 const HIDEOUT_Q=`{hideoutStations{name levels{level itemRequirements{count item{name avg24hPrice iconLink}}}}}`;
 async function loadHideout(){
@@ -766,12 +795,24 @@ async function loadPlates(){
     return d;
   }catch(e){console.warn('plates');return __c?__c.d:null;}
 }
+/* plate compatibility comes from the bundled tkm_slots1 table (armor/rig name → slots → allowed plates);
+   typo-tolerant: exact → contains → fuzzy word match. Falls back to the live API only if the table is missing. */
 async function plateSlots(q){
   const ck='ps:'+q.toLowerCase();
   if(itemCache.has(ck))return itemCache.get(ck);
+  let it=null;
+  try{
+    const c=JSON.parse(packGet('tkm_slots1')||'null');
+    if(c&&c.d){
+      const names=Object.keys(c.d),Q=q.toLowerCase();
+      const hit=names.find(n=>n.toLowerCase()===Q)||names.find(n=>n.toLowerCase().includes(Q))||names.find(n=>fz(n,q));
+      if(hit)it={name:hit,properties:{armorSlots:c.d[hit]}};
+      itemCache.set(ck,it);return it;
+    }
+  }catch(e){}
   try{
     const r=await gql(`{items(name:${JSON.stringify(q)},limit:4){name properties{...on ItemPropertiesChestRig{armorSlots{nameId ...on ItemArmorSlotOpen{allowedPlates{name}}}} ...on ItemPropertiesArmor{armorSlots{nameId ...on ItemArmorSlotOpen{allowedPlates{name}}}}}}}`);
-    const it=(r.items||[]).find(i=>i.properties&&i.properties.armorSlots&&i.properties.armorSlots.length)||null;
+    it=(r.items||[]).find(i=>i.properties&&i.properties.armorSlots&&i.properties.armorSlots.length)||null;
     itemCache.set(ck,it);return it;
   }catch(e){return null;}
 }
@@ -932,7 +973,8 @@ const SPECIAL_NOTES={
 /* per-map entry/exit guides shown in the Intel panel */
 const MAP_GUIDES={
  reserve:'<b>MAP LOCKED FOR A FRIEND?</b> In the current patch the unlock is the <b>Tour story chapter</b>: when its task appears, hand in <b>5 PMC dog tags</b> (in PvE the AI PMCs drop them &mdash; loot the tag off the body) plus the item Jaeger asks for (his task card names it). Complete those turn-ins and Reserve joins the map-select screen. Prapor&#39;s Customs line (Background Check &rarr; Delivery From the Past &rarr; BP Depot &rarr; The Bunker Part 1) feeds the same story &mdash; do whichever tasks he actually offers; all are marked on Customs (search in 🔍). <b>Backdoor while locked:</b> transit in via the ⇄ Reserve door on Woods at the rail depot and extract here normally.',
- terminal:'<b>THE STORY FINALE MAP</b> — the port, dominated by the docked <b>icebreaker ship</b> (the thing everyone calls the map by). Unlocked late in the 1.0 story chapters. Live extracts/locks attach to this map automatically when the community database syncs its data — until then you get the base layout for orientation.',
+ terminal:'<b>THE STORY FINALE MAP</b> — the southern port, held by the Russian Armed Forces since the blockade; the primary evacuation point of the story. <b>1–5 players · 50 min.</b> Enemy roster in the database: Scavs, <b>Black Division</b> and <b>AF</b> military units, plus rotating bosses (Sanitar, Glukhar, Killa, Reshala, Tagilla are all listed). Unlocked late in the story chapters. The community database has no extract coordinates for Terminal yet — the layout is for orientation; spawns, locks and mission zones attach automatically as data lands. <b>Note:</b> the ship is NOT this map — the icebreaker <i>Boreas</i> is its own map, the <b>Icebreaker</b> tab.',
+ icebreaker:'<b>THE BOREAS</b> — a nuclear icebreaker (Paradigm Shipping) stuck in the Gulf of Finland. <b>1–3 players · 50 min · ship-interior map, decks are the floor buttons above</b> (Infirmary is the default deck; Engine Room, Bridge, Accommodation, Fuel Pumps…). <b>GETTING THERE:</b> it is a story map — the <i>Boreas</i> chapter starts with Mechanic (find the Paradigm ship poster on Ground Zero or Lighthouse, or use the Intelligence Center L3 radio), then Woods radio-tower repair (bring a Toolkit) → Lighthouse shipping documents → a Prapor branch (helicopter oil on Reserve) and a BTR Driver branch. You board from the <b>Shoreline pier</b> by hovercraft; the database lists the <b>Sudak-Tudak marine repair kit</b> (special-slot item) as the access item for the trip — carry one. Community guides at launch also reported a 400k ₽ fare — expect a cost. <b>GETTING OUT:</b> the only extract in the database is <b>Helicopter</b> (PMC) — launch guides say it needs a <b>green flare</b> plus <b>2,500 €</b>; euros drop around the ship and on The Wedge. <b>WHO IS ABOARD:</b> Scavs, Rogues, <b>Black Division</b> squads, <b>Knight</b>, and the ship boss <b>The Wedge</b> (quest “A Wedge Between Us”). <b>KEYCARDS:</b> Boreas crew quarters, Boreas engine room, Compartment C-1 and C-3 — all marked 🔑 on the decks. Missions here: Peaceful Atom, Wiring the Vessel, A Wedge Between Us, Stick to It (Rogues), plus kill tasks — turn on the ★ Missions layer.',
  'the-lab':'<b>TWO WAYS IN (1.0):</b> ① Select The Lab from the map screen — needs a <b>TerraGroup Labs access keycard</b>, consumed on entry (flea, barters, rare loot). ② <b>Transit from Streets</b> — the underground entrance on <b>Klimova St, the building with the cosmonaut mural</b>: take the stairs beside the building down to the basement metal door (the ⇄ transit marker on the Streets map). Opens 1 minute after raid start and STILL consumes an access keycard. Your first-ever visit is unlocked through the story "Tour" chapter.<br><br><b>YOUR YELLOW KEYCARD</b> is a room key <i>inside</i> Labs, not the entry ticket — its door is marked 🔑 on this map (type "yellow" in the 🔍 search to jump to it). Don\'t confuse it with the white <i>access</i> keycard.<br><br><b>EASIEST FIRST RAID:</b> go as a duo, learn the extracts BEFORE looting — click the lettered markers: several need switches/power, the vent shaft takes no backpack. Raiders respond to noise and objectives; walk, don\'t sprint, and never chase gunfire you didn\'t start. Loot one wing (yellow card room + med blocks), leave early, count it as a win.',
  factory:'<b>⇄ LABS ENTRANCE on this map (the easy one):</b> the Transit to The Lab door — see the ⇄ marker. Factory is tiny, so it\'s 2–3 minutes from any spawn: wait out the 1-minute raid timer, use the door, your TerraGroup Labs <i>access</i> keycard is consumed, and you continue into Labs with your current kit. Also has transits to Woods and Customs.',
  'streets-of-tarkov':'<b>⇄ LABS ENTRANCE on this map:</b> Klimova St — the building with the <b>cosmonaut mural</b>; the stairwell beside it leads down to a basement metal door (see the ⇄ transit marker, or search "lab" in 🔍). Needs a TerraGroup Labs <i>access</i> keycard (consumed), usable from 1 minute after raid start.'
@@ -981,11 +1023,23 @@ async function seedFromSite(){
     return Object.keys(o).length>0;
   }catch(e){return false;}
 }
-/* read a cache entry: your own saved data first, then the site's bundled datapack */
+/* read a cache entry: the NEWER of your own saved copy and the site's bundled datapack */
 function cacheRead(k,ttl){try{const c=JSON.parse(packGet(k)||'null');if(c&&c.d!==undefined)return {fresh:(Date.now()-c.ts)<ttl,d:c.d};}catch(e){}return null;}
+const _pgNewer={};   /* per-key verdict, so the timestamp compare runs once per session */
 function packGet(k){
-  try{const v=localStorage.getItem(k);if(v)return v;}catch(e){}
-  try{return (window.__SEED&&window.__SEED[k])||null;}catch(e){return null;}
+  let ls=null,sd=null;
+  try{ls=localStorage.getItem(k);}catch(e){}
+  try{sd=(window.__SEED&&window.__SEED[k])||null;}catch(e){}
+  if(ls&&sd){
+    /* the site's datapack is rebuilt every 6h from tarkov.dev — if it is newer than the copy saved in this
+       browser, the saved copy is stale (old quest names, old prices) and must not shadow it */
+    if(_pgNewer[k]===undefined){
+      try{const a=/"ts":(\d+)/.exec(ls),b=/"ts":(\d+)/.exec(sd);_pgNewer[k]=!!(a&&b&&+b[1]>+a[1]);}catch(e){_pgNewer[k]=false;}
+      if(_pgNewer[k]){try{localStorage.removeItem(k);}catch(e){}}
+    }
+    return _pgNewer[k]?sd:ls;
+  }
+  return ls||sd;
 }
 /* 📦 data pack: export your downloaded caches / import a friend's — makes a freshly-shared file work instantly.
    Includes EVERY game-data cache, any generation (older map caches still render fine) — never personal data. */
@@ -1159,19 +1213,44 @@ function fz(text,q){
     return false;
   }));
 }
+/* unlock conditions line — prerequisites, trader loyalty, keys, Kappa/Lightkeeper flags (patch-current data) */
+function taskReqHTML(t){
+  const bits=[];
+  if(t.minPlayerLevel)bits.push('player level <b>'+t.minPlayerLevel+'</b>');
+  if(t.ll)bits.push((t.trader?t.trader.name:'trader')+' loyalty <b>LL'+t.ll+'</b>'+(TRADER_LVL[t.trader&&t.trader.name]?' (≈ level '+TRADER_LVL[t.trader.name][t.ll-1]+')':''));
+  if(t.req&&t.req.length)bits.push('finish first: '+t.req.map(n=>'<u style="cursor:pointer" onclick="taskByName('+JSON.stringify(n).replace(/"/g,'&quot;')+')">'+n+'</u>').join(', '));
+  if(t.faction)bits.push('<b>'+t.faction+'</b> only');
+  let h=bits.length?'<p style="color:#a9bad2;margin-bottom:6px"><b>Unlocks when:</b> '+bits.join(' · ')+'</p>':'';
+  const flags=[];
+  if(t.kappa)flags.push('<span style="color:#f0abfc">★ needed for Kappa</span>');
+  if(t.lk)flags.push('<span style="color:#7dd3fc">⚡ needed for Lightkeeper</span>');
+  if(t.xp)flags.push(fmt(t.xp)+' XP');
+  if(t.keys&&t.keys.length)flags.push('🔑 keys: '+t.keys.map(k=>'<u style="cursor:pointer" onclick="keyOpen('+JSON.stringify(k).replace(/"/g,'&quot;')+')">'+k+'</u>').join(', '));
+  if(flags.length)h+='<p style="margin-bottom:8px">'+flags.join(' · ')+'</p>';
+  return h;
+}
+function taskByName(n){const t=(S.tasks||[]).find(x=>x.name===n);if(t)showTaskInfo(t);}
 function taskInfoHTML(t){
-  let h='';
+  let h=taskReqHTML(t);
   (t.objectives||[]).forEach(o=>{
-    if(!o.description&&!o.item)return;
-    h+='<p style="margin-bottom:4px">• '+(o.description||o.type||'')+'</p>';
+    if(!o.description&&!o.item&&!o.qitem)return;
+    const extra=[];
+    if(o.optional)extra.push('<i style="color:#8b98ab">optional</i>');
+    if(o.type==='shoot'&&o.count)extra.push('×'+o.count+(o.targets&&o.targets.length&&o.targets[0]!=='Any'?' '+o.targets.join('/'):''));
+    if(o.dist)extra.push('from '+o.dist.replace('>=','≥ ').replace('<=','≤ '));
+    if(o.weapons&&o.weapons.length)extra.push('with '+o.weapons.join(' / '));
+    h+='<p style="margin-bottom:4px">• '+(o.description||o.type||'')+(extra.length?' <span style="color:#a9bad2">('+extra.join(' · ')+')</span>':'')+'</p>';
     if(o.item){
-      h+=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px 12px">${o.item.iconLink?`<img class="iico" src="${o.item.iconLink}" loading="lazy">`:''}<span><b>${o.item.name}</b>${o.count?' ×'+o.count:''}<br>${o.foundInRaid?'<b style="color:#fbbf24">⭐ FOUND IN RAID required</b> — must be looted in raid & extracted, flea-bought won\'t count':'<span style="color:#8fdc9b">no FIR needed — buying works</span>'}</span></div>`;
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px 12px">${o.item.iconLink?`<img class="iico" src="${o.item.iconLink}" loading="lazy">`:''}<span><b>${o.item.name}</b>${o.alts>1?' <span style="color:#a9bad2">or any of '+(o.alts-1)+' other accepted items</span>':''}${o.count?' ×'+o.count:''}<br>${o.foundInRaid?'<b style="color:#fbbf24">⭐ FOUND IN RAID required</b> — must be looted in raid & extracted, flea-bought won\'t count':'<span style="color:#8fdc9b">no FIR needed — buying works</span>'}</span></div>`;
+    }else if(o.qitem){
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin:2px 0 8px 12px">${o.qitem.iconLink?`<img class="iico" src="${o.qitem.iconLink}" loading="lazy">`:''}<span><b>${o.qitem.name}</b> <span style="color:#a9bad2">— quest item, spawns only in raid at the marked spot(s)</span></span></div>`;
     }
   });
   return h||'<p>No detailed objective data.</p>';
 }
 function showTaskInfo(t){
-  openDetail({cat:'quest',name:t.name,sub:(t.trader?t.trader.name:'')+(t.minPlayerLevel?' · unlocks at level '+t.minPlayerLevel:''),body:taskInfoHTML(t)+`<p><a href="https://escapefromtarkov.fandom.com/wiki/${encodeURIComponent(t.name.replace(/ /g,'_'))}" target="_blank">Full wiki guide ↗</a></p>`});
+  const wiki=t.wiki||('https://escapefromtarkov.fandom.com/wiki/'+encodeURIComponent(t.name.replace(/ /g,'_')));
+  openDetail({cat:'quest',name:t.name,sub:(t.trader?t.trader.name:'')+(t.minPlayerLevel?' · unlocks at level '+t.minPlayerLevel:''),body:taskInfoHTML(t)+`<p><a href="${wiki}" target="_blank">Full wiki guide ↗</a></p>`});
 }
 function setFocus(mission){S.focus=mission?[mission]:null;S.guide=null;renderMap(S.cfg.id,true);}
 function toggleFocus(mission){
@@ -1820,9 +1899,10 @@ async function renderMap(id,keepView){
   if(!cfg.layers.length&&SVGF)SVGF.floors.forEach((f,i)=>floorDefs.push({name:f[0],svgIdx:i}));
   if(floorDefs.length){
     const fl=document.createElement('span');fl.className='floorlbl';fl.textContent='Floor:';floorsHost.appendChild(fl);
-    const mkFloor=(name,fn)=>{const bt=document.createElement('div');bt.className='fl'+(name==='Ground'?' on':'');bt.dataset.f=name;bt.textContent=name;
+    const baseName=cfg.baseName||'Ground';
+    const mkFloor=(name,fn)=>{const bt=document.createElement('div');bt.className='fl'+(name===baseName?' on':'');bt.dataset.f=name;bt.textContent=name;
       bt.onclick=()=>{curFloor=name;fn();renderLabels();document.querySelectorAll('.fl').forEach(x=>x.classList.toggle('on',x===bt));};floorsHost.appendChild(bt);};
-    mkFloor('Ground',()=>{if(!cfg.svg)baseLayer(null);setSvgFloor(-1);});
+    mkFloor(baseName,()=>{if(!cfg.svg)baseLayer(null);setSvgFloor(-1);});
     floorDefs.forEach(f=>mkFloor(f.name,()=>{
       if(f.tile!==undefined){baseLayer(f.tile);setSvgFloor(-1);}
       else{if(!cfg.svg&&!S.tile)baseLayer(null);setSvgFloor(f.svgIdx);}
@@ -1832,8 +1912,8 @@ async function renderMap(id,keepView){
   else baseLayer(null);
   renderLabels();
   /* compass */
-  document.getElementById('cArrow').textContent=cfg.northDown?'▼':'▲';
-  document.getElementById('cTxt').innerHTML=cfg.northDown?'N (in-game)<br>points down':'N';
+  document.getElementById('cArrow').textContent=cfg.compass===false?'?':(cfg.northDown?'▼':'▲');
+  document.getElementById('cTxt').innerHTML=cfg.compass===false?'orientation<br>not verified':(cfg.northDown?'N (in-game)<br>points down':'N');
   /* sidebar reset */
   const side=document.getElementById('side');side.innerHTML='';
   /* omnibox handler (input recreated each render) */
@@ -1894,7 +1974,7 @@ async function renderMap(id,keepView){
       if(omni.value.toLowerCase().trim()!==myQ)return;
       itemSearch(myQ).then(its=>{
         if(omni.value.toLowerCase().trim()!==myQ||!its.length)return;
-        const g=document.createElement('div');g.className='gh';g.textContent='Items & attachments (live)';omnires.appendChild(g);
+        const g=document.createElement('div');g.className='gh';g.textContent='Items & attachments';omnires.appendChild(g);
         its.forEach(it=>{
           const d=document.createElement('div');d.className='item';
           d.innerHTML=`${it.iconLink?`<img class="iico" src="${it.iconLink}" loading="lazy">`:'<span class="ic" style="background:#6b7a90">?</span>'}<span class="t"><b>${it.name}</b><small>${it.category?it.category.name:''}${it.avg24hPrice?' · flea ≈'+fmt(it.avg24hPrice)+'₽':''} · ${bestSeller(it)}</small></span>`;
@@ -1914,7 +1994,7 @@ async function renderMap(id,keepView){
   };
   omni.onkeydown=e=>{if(e.key==='Escape'){omnires.style.display='none';omni.blur();}};
   const locNote=document.createElement('div');locNote.className='sec';
-  locNote.innerHTML=`<h2>📍 Locate yourself</h2><div class="body"><div class="note">Real imagery — zoom in and match buildings, roads and parked cars to what you see in-game.${cfg.northDown?' <b>In-game compass north points DOWN on this view</b> (tarkov.dev orientation).':''}<br><br>Turn on <b>PMC Spawns</b> to find your numbered start. Use <b>📏 Measure</b> for distances (shows sprint time), <b>📍 Add pin</b> to save your own notes — pins persist between sessions.</div></div>`;
+  locNote.innerHTML=`<h2>📍 Locate yourself</h2><div class="body"><div class="note">Real imagery — zoom in and match buildings, roads and parked cars to what you see in-game.${cfg.northDown&&cfg.compass!==false?' <b>In-game compass north points DOWN on this view</b> (tarkov.dev orientation).':''}<br><br>Turn on <b>PMC Spawns</b> to find your numbered start. Use <b>📏 Measure</b> for distances (shows sprint time), <b>📍 Add pin</b> to save your own notes — pins persist between sessions.</div></div>`;
   locNote.querySelector('h2').onclick=()=>locNote.classList.toggle('closed');
   side.appendChild(locNote);
   /* fetch data */
@@ -1932,7 +2012,7 @@ async function renderMap(id,keepView){
       if(left<=0){clearInterval(S.retryT);w.style.display='none';renderMap(cfg.id,true);}
     },1000);
   }
-  else if(S.staleData){S.retryN=0;note('info','Loaded instantly from your saved data - the live database is busy right now, nothing is missing, prices may be a few hours old. Refreshing silently in the background.',7000);}
+  else if(S.staleData){S.retryN=0;note('info','Loaded instantly from saved data. It is more than 12 h old - the site rebuilds its game data from tarkov.dev every 6 h, so a newer copy should appear on your next visit. Nothing is missing.',7000);}
   else{S.retryN=0;}
   const items={extract:[],scavx:[],transit:[],quest:[],qapi:[],key:[],loot:[],hazard:[],gun:[],spawn:[],land:[],sw:[],cont:[],gem:[],pin:[]};
   const seen=new Set();
@@ -1945,18 +2025,22 @@ async function renderMap(id,keepView){
     (data.extracts||[]).forEach(e=>{
       const k=e.name+'|'+e.faction;if(seen.has(k))return;seen.add(k);
       const cat=e.faction==='scav'?'scavx':'extract';
-      const note=EXTRACT_NOTES[cfg.id+'|'+e.name];
-      const sub=e.faction==='pmc'?'PMC':(e.faction==='scav'?'Scav only':'All factions / shared');
+      const lowOnly=/ \(lvl 1-20 raids only\)$/.test(e.name),baseNm=e.name.replace(/ \(lvl 1-20 raids only\)$/,'');
+      const note=EXTRACT_NOTES[cfg.id+'|'+baseNm];
+      const sub=(e.faction==='pmc'?'PMC':(e.faction==='scav'?'Scav only':'All factions / shared'))+(lowOnly?' · level 1–20 raids only':'');
       const sw=(e.switches||[]);
       const swHtml=sw.length?`<p><b>⚡ Requires:</b> ${sw.map(s=>s.name||'switch').join(' · ')}</p>`:'';
+      const lowHtml=lowOnly?'<p><b>⚠ Level 1–20 version only:</b> this exit exists in the low-level Ground Zero raid. Once your PMC is level 21+ you load the 21+ version of the map, where it is gone — use the other exits.</p>':'';
       const focusBtn=`<div class="tool" style="display:inline-block;margin-top:4px" onclick="extractFocus('${e.name.replace(/'/g,"\\'")}')">🎯 Focus this extract${sw.length?' — show the switches':''}</div>`;
-      const m=addMarker(cat,[e.position.z,e.position.x],e.name,sub,`<p><b>HOW TO USE:</b> ${note||extractReq(e.name,e.faction)}</p>${swHtml}${focusBtn}<p style="font-size:10.5px;color:var(--dim);margin-top:6px">Basics: stand inside the zone until the timer completes — squadmates must be in it together. Only the exits on your in-game list (double-tap O at raid start) are active THIS raid; "access denied" means this one isn't, not that you're missing something — unless a requirement is named above.</p><p style="margin-top:4px"><a href="https://escapefromtarkov.fandom.com/wiki/${encodeURIComponent(cfg.label.replace(/ /g,'_'))}" target="_blank" style="font-size:11px;color:var(--dim)">map wiki (backup) ↗</a></p>`,{glyph:e.name[0],vex:/V-Ex/i.test(e.name),coop:/Co-?op|shared/i.test(e.name)||e.faction==='shared'});
+      const m=addMarker(cat,[e.position.z,e.position.x],e.name,sub,`${lowHtml}<p><b>HOW TO USE:</b> ${note||extractReq(baseNm,e.faction)}</p>${swHtml}${focusBtn}<p style="font-size:10.5px;color:var(--dim);margin-top:6px">Basics: stand inside the zone until the timer completes — squadmates must be in it together. Only the exits on your in-game list (double-tap O at raid start) are active THIS raid; "access denied" means this one isn't, not that you're missing something — unless a requirement is named above.</p><p style="margin-top:4px"><a href="https://escapefromtarkov.fandom.com/wiki/${encodeURIComponent(cfg.label.replace(/ /g,'_'))}" target="_blank" style="font-size:11px;color:var(--dim)">map wiki (backup) ↗</a></p>`,{glyph:e.name[0],vex:/V-Ex/i.test(e.name),coop:/Co-?op|shared/i.test(e.name)||e.faction==='shared'});
       m.glyph=e.name[0];items[cat].push(m);
       if(cat==='extract'||cat==='scavx')S.lastExtracts.push({name:e.name,ll:[e.position.z,e.position.x],switches:sw});
       if(cat==='extract')S.focusExits.push({ll:[e.position.z,e.position.x],name:e.name});
     });
     (data.transits||[]).forEach(t=>{
-      const m=addMarker('transit',[t.position.z,t.position.x],t.description||'Transit','Continues your raid on another map',`<p>${t.description||''}. Take it to move straight into the next map with your current gear.</p>`,{glyph:'→'});
+      const dest=t.to?mapOfNorm(t.to):null;
+      const jump=dest?`<div class="tool" style="display:inline-block;margin-top:4px" onclick="renderMap('${dest.id}')">🗺 Open the ${dest.label} map</div>`:'';
+      const m=addMarker('transit',[t.position.z,t.position.x],t.description||'Transit','Continues your raid on another map',`<p>${t.description||''}. Take it to move straight into the next map with your current gear — your loot stays on you and keeps found-in-raid status. The transit itself is NOT an extract: "survive and extract" objectives tick only when you extract properly on the destination map, and then the whole chain counts as one survived raid.</p>${jump}`,{glyph:'→'});
       m.glyph='→';items.transit.push(m);
     });
     (data.locks||[]).forEach(l=>{
@@ -2733,7 +2817,7 @@ function showPage(v){
         fbT=setTimeout(async()=>{
           const its=await itemSearch(q);
           const it=(its||[])[0];
-          if(!it){out.innerHTML='<div class="psub">Nothing in the live item database matches that — check the spelling, or try the 🔍 search on the Map view.</div>';return;}
+          if(!it){out.innerHTML='<div class="psub">Nothing in the item database matches that — check the spelling, or try the 🔍 search on the Map view.</div>';return;}
           const sk=Object.keys(SPECIAL_NOTES).find(k=>it.name.toLowerCase().includes(k.toLowerCase()));
           out.innerHTML=`<div class="icard" style="max-width:600px"><div class="ihead" style="font-size:12.5px">${it.iconLink?`<img src="${it.iconLink}" style="width:28px;height:28px;object-fit:contain">`:''}${it.name}${it.category?`<span class="clsb" style="margin-left:auto;font-size:9.5px;padding:0 6px;white-space:nowrap">${it.category.name}</span>`:''}</div><div class="ibody">
             ${it.description?`<p style="font-size:11.5px;color:var(--dim)">${it.description.slice(0,240)}${it.description.length>240?'…':''}</p>`:''}
@@ -2794,6 +2878,11 @@ document.querySelectorAll('.vtab').forEach(t=>t.onclick=()=>showPage(t.dataset.v
       if(first&&w){note('info','First visit - downloading the bundled game data (about 2 MB, a few seconds). After this the app opens instantly, even offline.');}
       await seedFromSite();
       if(first&&w)w.style.display='none';
+      applyTraderTable();
+      /* tell the player how old the game data is — it is rebuilt from tarkov.dev every 6 hours */
+      try{const m=JSON.parse(packGet('tkm_meta')||'null');
+        if(m&&m.d&&m.d.built){const h=Math.round((Date.now()-m.d.built)/3600000);S.dataAge=h;
+          if(w&&(first||h>36))note('info','Game data: patch-current tarkov.dev feed, updated '+(h<1?'under an hour':h+' h')+' ago · '+m.d.tasks+' tasks · '+m.d.maps+' maps.'+(h>36?' <b>Older than usual</b> - the automatic 6-hourly refresh may have hit a snag; everything still works.':''),9000);}}catch(e){}
     }
   }catch(e){}
   let start=packGet('tkm_last')||'ground-zero';
